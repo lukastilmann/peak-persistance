@@ -1,0 +1,57 @@
+```{r}
+source("../R/sim_data.R")
+source("../R/visualization.R")
+
+set.seed(123)
+```
+
+
+```{r}
+# Combined function with various bases
+combined_func <- generate_benchmark_function(
+  bases = list(1, 2, "normal", "sine"),  # x^1, x^2, normal, sine
+  coefficients = list(
+    1,        # Coefficient for x^1 term
+    3,        # Coefficient for x^2 term
+    20,        # Coefficient for normal distribution
+    0.5         # Coefficient for sine
+  ),
+  shifts = c(0, 0.5, 0.5 , 0),     # Shifts for each basis
+  scale_factors = c(2, 2, 5, 25)      # Amplitude factors
+)
+
+functional_data <- generate_functional_curves(n = 20,
+                                              num_points = 100,
+                                              g = combined_func,
+                                              warping = "simple",
+                                              sigma_amplitude = 0.1,
+                                              scale_factor = 0.01,
+                                              nugget = 0.0001)
+
+```
+
+
+```{r}
+plot_simulated_curves(curves = functional_data$curves, 
+                      t_grid = functional_data$t_grid,
+                      g = functional_data$base_function)
+```
+
+
+```{r}
+visualize_parameter_impacts_tf(functional_data)
+```
+
+```{r}
+n_functions <- 20
+t_grid <- seq(0, 1, length.out = 100)
+warping_functions <- lapply(1:n_functions, function(i) {
+  f <- generate_warping_function(n_points = 5, seed = i)
+  f(t_grid)
+})
+
+warping_functions_tf <- tfd(warping_functions, t_grid)
+
+visualize_warping_functions(warping_functions_tf)
+```
+
