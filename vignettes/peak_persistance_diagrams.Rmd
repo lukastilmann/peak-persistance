@@ -1,0 +1,54 @@
+```{r}
+source("../R/sim_data.R")
+source("../R/visualization.R")
+source("../R/pp_diagram.R")
+```
+
+```{r}
+combined_func <- generate_benchmark_function(
+  bases = list("normal", "normal"),  # x^1, x^2, normal, sine
+  coefficients = list(
+    50,
+    50
+  ),
+  shifts = c(0.3, 0.6),     # Shifts for each basis
+  scale_factors = c(10, 10)      # Amplitude factors
+)
+
+curve_data <- generate_functional_curves(n = 100,
+                           num_points = 100,
+                           g = combined_func,
+                           warping = "simple",
+                           sigma_amplitude = 0.1,
+                           scale_factor = 1,
+                           nugget = 0.0005)
+
+
+plot_simulated_curves(curves = curve_data$curves,
+                      t_grid = curve_data$t_grid,
+                      g = curve_data$base_function)
+```
+
+
+```{r}
+t_grid <- curve_data$t_grid
+curves <- curve_data$curves
+
+n_lambda <- 5
+max_lam <- 2
+lambda_values <- seq(0, max_lam, length.out = n_lambda)
+sig_threshold <- 0.03
+pers_threshold <- 0.28
+```
+
+
+```{r}
+ret <- peak_persistance_diagram(curves, t_grid, 1, 5, sig_threshold, pers_threshold)
+```
+Peak-persistance diagram in barchart form
+```{r}
+ret$bc
+```
+
+
+
