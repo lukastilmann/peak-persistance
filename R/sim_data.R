@@ -1,5 +1,6 @@
 library(tidyfun)
 library(ggplot2)
+library(gtools)
 
 
 # Flexible function generator for mathematical benchmark functions
@@ -69,6 +70,7 @@ generate_benchmark_function <- function(bases,
 
 # Function to generate boundary-preserving warping functions
 generate_warping_function <- function(n_points = 5,
+                                      lambda = 0,
                                       seed = NULL) {
   # Set seed for reproducibility if provided
   if (!is.null(seed)) set.seed(seed)
@@ -83,7 +85,7 @@ generate_warping_function <- function(n_points = 5,
 
   # Sample increments from Dirichlet distribution
   # Add 1 to each interval size to ensure positive parameters
-  dirichlet_params <- interval_sizes + 1
+  dirichlet_params <- interval_sizes * (1 + lambda)
   increments <- rdirichlet(1, dirichlet_params)[1,]
 
   # Calculate cumulative function values

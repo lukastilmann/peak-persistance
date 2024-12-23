@@ -45,8 +45,22 @@ visualize_parameter_impacts_tf(functional_data)
 ```{r}
 n_functions <- 20
 t_grid <- seq(0, 1, length.out = 100)
+lambda <- 0
 warping_functions <- lapply(1:n_functions, function(i) {
-  f <- generate_warping_function(n_points = 5, seed = i)
+  f <- generate_warping_function(n_points = 5, lambda = lambda, seed = i)
+  f(t_grid)
+})
+
+warping_functions_tf <- tfd(warping_functions, t_grid)
+
+visualize_warping_functions(warping_functions_tf)
+```
+```{r}
+n_functions <- 20
+t_grid <- seq(0, 1, length.out = 100)
+lambda <- 10
+warping_functions <- lapply(1:n_functions, function(i) {
+  f <- generate_warping_function(n_points = 5, lambda = lambda, seed = i)
   f(t_grid)
 })
 

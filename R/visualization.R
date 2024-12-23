@@ -3,12 +3,12 @@ library(ggplot2)
 library(reshape2)
 library(gridExtra)
 library(grid)
-library(gtools)
+
 
 # Plotting a set of function curves, optionally with base function g in red
 plot_simulated_curves <- function(curves, t_grid, g = NULL) {
 
-  curve_data <- as.data.frame(functional_data$curves)
+  curve_data <- as.data.frame(curves)
   colnames(curve_data) <- c("curves")
 
   # plotting with function in red if base function has been passed as argument
