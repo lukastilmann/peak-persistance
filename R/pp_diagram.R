@@ -83,30 +83,31 @@ align_functions <- function(fun_curves, lambda = 0.0, parallel = FALSE,
 # Computes mean function, locations of peaks and valleys, and height and
 # curvature of peaks
 analyze_mean_function <- function(curves) {
+
   curves_mean <- mean(curves)
   #TODO: vary smoothing by arguments to function
   #curves_mean <- tf_smooth(curves_mean)
-  # Issues with finding peaks based on slope
   slope <- tf_derive(curves_mean, order = 1)
   second_derivative <- tf_derive(curves_mean, order = 2)
 
   # Find peaks (local maxima) - where slope changes from positive to negative
   peaks <- tf_where(
     slope,
-    sign(c(diff(value)[1], diff(value))) != sign(c(diff(value), tail(diff(value), 1))) &
-      sign(c(diff(value)[1], diff(value))) > 0
-  )
+    value < 0 & dplyr::lag(value, 1, value[1]) > 0)
 
   # Find valleys (local minima) - where slope changes from negative to positive
   valleys <- tf_where(
     slope,
-    sign(c(diff(value)[1], diff(value))) != sign(c(diff(value), tail(diff(value), 1))) &
-      sign(c(diff(value)[1], diff(value))) < 0
-  )
+    value > 0 & dplyr::lag(value, 1, value[1]) < 0)
 
   # Compute height and negative curvature at peak locations
-  peak_heights <- curves_mean[, peaks[[1]]]
-  peak_curvatures <- - second_derivative[,peaks[[1]]]
+  # Accounting for reduction of arg at edges of interval when calculating
+  # derivative
+  peak_loc <- peaks[[1]]
+  peak_loc <- peak_loc[peak_loc < max(tf_arg(second_derivative)) &
+                         peak_loc > min(tf_arg(second_derivative))]
+  peak_heights <- curves_mean[, peak_loc]
+  peak_curvatures <- - second_derivative[, peak_loc]
 
   # ensuring non-negative curvatures and normalizing
   # is there a way to do this in tidyfun?
@@ -272,7 +273,7 @@ peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 
                                      sig_threshold = 0.03, pers_threshold = 0.28){
   # Create dataframe with function curves
   curves <- curve_data$curves
-  curves <- tfb(curves, basis = "spline")
+  curves <- tfb(curves, basis = "spline", bs = "bs")
   curves_df <- data.frame(curves)
   colnames(curves_df) <- c("curves")
 
