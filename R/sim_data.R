@@ -111,6 +111,8 @@ generate_functional_curves <- function(n = 50,
                                        num_points = 100,
                                        g,
                                        warping = "simple",
+                                       warping_lambda = 0,
+                                       warping_points = 5,
                                        sigma_amplitude = 0.01,
                                        scale_factor = 0.01,
                                        nugget = 0.01) {
@@ -131,7 +133,8 @@ generate_functional_curves <- function(n = 50,
   } else if (warping == "flexible"){
     # Draw random warping function with more flexibility
     grid_warped <- sapply(1:n, function(i){
-      generate_warping_function()(t_grid)
+      generate_warping_function(n_points = warping_points,
+                                lambda = warping_lambda)(t_grid)
     })
   } else {
     stop("Warping type not specified correctly.")

@@ -8,18 +8,19 @@ source("../R/pp_diagram.R")
 combined_func <- generate_benchmark_function(
   bases = list("normal", "normal", "sine"),  # x^1, x^2, normal, sine
   coefficients = list(
-    50,
-    50,
-    5
+    10,
+    10,
+    1
   ),
   shifts = c(0.3, 0.6, 0),     # Shifts for each basis
-  scale_factors = c(10, 10, 25)      # Amplitude factors
+  scale_factors = c(10, 10, 30)      # Amplitude factors
 )
 
-curve_data <- generate_functional_curves(n = 100,
+curve_data <- generate_functional_curves(n = 20,
                            num_points = 100,
                            g = combined_func,
-                           warping = "simple",
+                           warping = "flexible",
+                           warping_lambda = 3,
                            sigma_amplitude = 0.1,
                            scale_factor = 1,
                            nugget = 0.01)
@@ -44,11 +45,12 @@ pers_threshold <- 0.28
 
 
 ```{r}
-ret <- peak_persistance_diagram(curves, t_grid, 1, 25, sig_threshold, pers_threshold)
+ret <- peak_persistance_diagram(curves, t_grid, 2, 2, sig_threshold, pers_threshold)
 ```
 Peak-persistance diagram in barchart form
 ```{r}
-ret$bc
+#ret$bc
+ret$surface
 ```
 
 

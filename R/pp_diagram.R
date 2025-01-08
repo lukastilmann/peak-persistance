@@ -129,11 +129,11 @@ analyze_mean_function <- function(curves) {
 
 
 # Finds which labeled peaks are in same location as peak in previous curve
-peak_successor <- function(peaks1, valleys1, peaks2, valleys2, labels1) {
+peak_successor <- function(peaks1, valleys1, peaks2, valleys2, labels1, t_grid) {
   # Helper function to compute ranges for peaks
   compute_peak_ranges <- function(peaks, valleys) {
     # Ensure valleys include endpoints
-    all_valleys <- sort(unique(c(t_grid[0], valleys, t_grid[-1])))
+    all_valleys <- sort(unique(c(t_grid[1], valleys, t_grid[length(t_grid)])))
 
     # For each peak, find its containing range
     ranges <- lapply(peaks, function(peak) {
@@ -268,11 +268,37 @@ find_persistent_peaks <- function(significant_peaks, ratio_threshold) {
 }
 
 
+# Function to find optimal lambda index
+find_optimal_lambda <- function(significant_peaks, persistent_labels) {
+  # Convert significant peaks to matrix form
+  n_lams <- length(significant_peaks)
+  ref_row <- numeric(max(unlist(significant_peaks)))
+  ref_row[persistent_labels] <- 1
+
+  # Calculate Hamming distances
+  hamming_distances <- sapply(significant_peaks, function(peaks) {
+    comp <- numeric(length(ref_row))
+    comp[peaks] <- 1
+    sum(comp != ref_row)
+  })
+
+  # Find exact matches
+  exact_matches <- which(hamming_distances == 0)
+
+  if (length(exact_matches) > 0) {
+    return(min(exact_matches))
+  } else {
+    min_distance <- min(hamming_distances)
+    return(min(which(hamming_distances == min_distance)))
+  }
+}
+
+
 # main function
 peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 10,
                                      sig_threshold = 0.03, pers_threshold = 0.28){
   # Create dataframe with function curves
-  curves <- curve_data$curves
+  #curves <- curve_data$curves
   curves <- tfb(curves, basis = "spline", bs = "bs")
   curves_df <- data.frame(curves)
   colnames(curves_df) <- c("curves")
@@ -288,7 +314,7 @@ peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 
   aligned_list <- lapply(lambda_values, function(lambda) {
     print(paste("Alignment for:", lambda))
     aligned <- align_functions(curves_df, lambda = lambda, parallel = TRUE,
-                               max_iter = 5, t_grid = curve_data$t_grid)
+                               max_iter = 20, t_grid = curve_data$t_grid)
     return(aligned)
   })
 
@@ -347,7 +373,8 @@ peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 
       valleys1 = valleys1,
       peaks2 = peaks2,
       valleys2 = valleys2,
-      labels1 = labels1
+      labels1 = labels1,
+      t_grid
     )
 
     # Store new labels
@@ -364,14 +391,33 @@ peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 
 
   # Calculate persistance of peaks
   res <- find_persistent_peaks(significant_peaks, pers_threshold)
+  num_peaks <- length(res$persistent_labels)
+
+  # Find optimal lambda index
+  idx_opt <- find_optimal_lambda(significant_peaks,
+                                 as.numeric(names(res$intervals)))
+  opt_lambda <- lambda_values[idx_opt]
 
   # Persistance diagram in barchart form
   persistence_plot_bc <- create_persistence_diagram_bc(res$intervals)
 
+  # Peak Persistance surface
+  persistance_plot_sf <- create_persistance_diagram_sf(t_grid, lambda_values,
+                                                       mean_functions, all_peaks,
+                                                       all_labels, significant_peaks)
+
   return(list(
     bc = persistence_plot_bc,
+    surface = persistance_plot_sf,
     significant_peaks = significant_peaks,
-    intervals = res$intervals
+    intervals = res$intervals,
+    lam = lambda_values,
+    grid = t_grid,
+    mfn = mean_functions,
+    peak_locs = all_peaks,
+    labels = all_labels,
+    opt_lam = opt_lambda,
+    num_peaks = num_peaks
   ))
 }
 
@@ -422,3 +468,146 @@ create_persistence_diagram_bc <- function(intervals) {
       plot.subtitle = element_text(size = 10)
     )
 }
+
+
+# Helper function to create location matrices
+create_location_matrix <- function(locs, labels, lambda_values) {
+  label_max = max(unlist(labels))
+  n_lams <- length(lambda_values)
+
+  # Initialize matrices
+  location_matrix <- matrix(NA, nrow = n_lams, ncol = label_max)
+
+  # Fill location matrix
+  for (i in 1:n_lams) {
+    if (length(labels[[i]]) > 0) {
+      location_matrix[i, labels[[i]]] <- locs[[i]]
+    }
+  }
+
+  return(location_matrix)
+}
+
+
+# Main function to draw PPD surface
+create_persistance_diagram_sf <- function(t_grid, lambda_values, mean_functions,
+                                          peak_locs, labels, sig_peaks) {
+
+  location_matrix <- create_location_matrix(peak_locs, labels, lambda_values)
+
+  # Each mean function is a tf with one function
+  mfn_list <- lapply(mean_functions, function(item){
+    item[[1]]
+  })
+
+  # warning thrown here, not sure how to remove
+  mfn_df <- tfd(mfn_list, arg = t_grid)
+
+  plot_data <- as.data.frame(mfn_df, unnest = TRUE, arg = t_grid)
+  plot_data$lambda <- get_lambda(plot_data$id)
+  plot_data <- plot_data %>% mutate(value = round(value, digits = 4))
+
+  # Create the plot
+  plot <- ggplot(plot_data, aes(x = arg, y = lambda)) +
+    # Use geom_raster for a continuous surface look
+    geom_raster(aes(fill = value), interpolate = TRUE) +
+    # Use viridis color scale (similar to MATLAB's parula)
+    scale_fill_viridis_c(
+      name = "g̃λ(t)",
+      option = "viridis"
+    ) +
+    # Adjust the aspect ratio to make it look more like MATLAB's output
+    coord_fixed(ratio = diff(range(t_grid)) / diff(range(lambda_values))) +
+    # Add labels and theme
+    labs(
+      x = "t",
+      y = "λ"
+    ) +
+    theme_minimal() +
+    # Fine-tune the appearance
+    theme(
+      legend.position = "right",
+      panel.grid = element_blank(),
+      axis.text = element_text(size = 10),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 10)
+    )
+
+  # Create a data frame for peak locations
+  # We'll process the indicator matrix to get x-y coordinates for each peak
+  peak_data <- data.frame()
+  label_data <- data.frame()
+
+  # For each column (peak) in the indicator matrix
+  for (peak_idx in 1:ncol(location_matrix)) {
+    # Find which lambda values (rows) have this peak
+    lambda_indices <- which(!is.na(location_matrix[, peak_idx]))
+
+    if (length(lambda_indices) > 0) {
+      # Get x and y coordinates for this peak's path
+      x_coords <- location_matrix[lambda_indices, peak_idx]
+      y_coords <- lambda_values[lambda_indices]
+
+      # Determine significance
+      # For each point along this peak's path, determine if it's significant
+      # by checking the significant_peaks list for each lambda value
+      is_significant <- sapply(lambda_indices, function(lambda_idx) {
+        # Get the significant peaks for this lambda value
+        sig_peaks_at_lambda <- sig_peaks[[lambda_idx]]
+        # Check if this peak is in the significant peaks for this lambda
+        peak_idx %in% sig_peaks_at_lambda
+      })
+
+      # Create temporary data frame for this peak's path
+      temp_df <- data.frame(
+        # x coordinates come from t_grid positions indicated in the matrix
+        x = x_coords,
+        # y coordinates are the corresponding lambda values
+        y = y_coords,
+        # Group identifier for connecting points
+        group = paste0("peak_", peak_idx),
+        # mask indicating whether peak is significant
+        significant = is_significant
+      )
+      peak_data <- rbind(peak_data, temp_df)
+
+      # Create label data frame for the end of this peak's path
+      # We'll use the last point (highest lambda value) for the label
+      # Label color based on significance of final lambda
+      label_df <- data.frame(
+        x = x_coords[length(x_coords)],
+        y = y_coords[length(y_coords)],
+        label = as.character(peak_idx),
+        significant = is_significant[length(is_significant)]
+      )
+      label_data <- rbind(label_data, label_df)
+    }
+  }
+
+  # Add peak markers and connections if we have peak data
+  if (nrow(peak_data) > 0) {
+    plot <- plot +
+      # Lines connecting peak positions
+      geom_path(data = peak_data,
+                aes(x = x, y = y, group = group),
+                color = "grey50",
+                linewidth = 2) +
+      # Points marking peak positions
+      geom_point(data = peak_data,
+                 aes(x = x, y = y),
+                 color = ifelse(peak_data$significant, "black", "grey50"),
+                 size = 2) +
+      # Add labels at the end of each peak line
+      geom_text(data = label_data,
+                aes(x = x, y = y, label = label),
+                color = "grey20",
+                size = 4,
+                nudge_x = diff(range(t_grid))/50,  # Slight offset to the right
+                nudge_y = diff(range(lambda_values))/50,  # Slight offset upward
+                fontface = "bold")
+  }
+
+  return(plot)
+}
+
