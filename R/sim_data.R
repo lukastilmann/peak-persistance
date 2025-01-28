@@ -115,7 +115,11 @@ generate_functional_curves <- function(n = 50,
                                        warping_points = 5,
                                        sigma_amplitude = 0.01,
                                        scale_factor = 0.01,
-                                       nugget = 0.01) {
+                                       nugget = 0.01,
+                                       seed = NULL) {
+  # Set seed for reproducibility if provided
+  if (!is.null(seed)) set.seed(seed)
+
   # number of points in grid
   t_grid <- seq(0, 1, length.out = num_points)
 
@@ -134,7 +138,8 @@ generate_functional_curves <- function(n = 50,
     # Draw random warping function with more flexibility
     grid_warped <- sapply(1:n, function(i){
       generate_warping_function(n_points = warping_points,
-                                lambda = warping_lambda)(t_grid)
+                                lambda = warping_lambda,
+                                seed = seed + i)(t_grid)
     })
   } else {
     stop("Warping type not specified correctly.")

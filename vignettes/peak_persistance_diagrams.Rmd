@@ -2,28 +2,45 @@
 source("../R/sim_data.R")
 source("../R/visualization.R")
 source("../R/pp_diagram.R")
+source("../R/utils.R")
+source("../R/find_max_lambda.R")
+source("../R/align_functions.R")
+source("../R/template_function.R")
+source("../R/basis.R")
+source("../R/shape_constrained_estimation.R")
+
 ```
 
 ```{r}
+r_files <- list.files(path = "../R/", 
+                      pattern = "\\.R$",
+                      full.names = TRUE)  # This returns full file paths
+
+# Source each file using sapply
+s <- sapply(r_files, source)
+```
+
+
+```{r}
 combined_func <- generate_benchmark_function(
-  bases = list("normal", "normal", "sine"),  # x^1, x^2, normal, sine
+  bases = list(3, "normal", "normal"),  # x^3, normal, normal, sine
   coefficients = list(
+    1,
     10,
-    10,
-    1
+    10
   ),
-  shifts = c(0.3, 0.6, 0),     # Shifts for each basis
-  scale_factors = c(10, 10, 30)      # Amplitude factors
+  shifts = c(0.5, 0.3, 0.7),     # Shifts for each basis
+  scale_factors = c(2,10, 10)      # Amplitude factors
 )
 
-curve_data <- generate_functional_curves(n = 20,
-                           num_points = 100,
-                           g = combined_func,
-                           warping = "flexible",
-                           warping_lambda = 3,
-                           sigma_amplitude = 0.1,
-                           scale_factor = 1,
-                           nugget = 0.01)
+curve_data <- generate_functional_curves(n = 50,
+                                         num_points = 100,
+                                         g = combined_func,
+                                         warping = "simple",
+                                         sigma_amplitude = 0.1,
+                                         scale_factor = 0.1,
+                                         nugget = 0.001,
+                                         seed = 123)
 
 
 plot_simulated_curves(curves = curve_data$curves,
@@ -36,22 +53,111 @@ plot_simulated_curves(curves = curve_data$curves,
 t_grid <- curve_data$t_grid
 curves <- curve_data$curves
 
-n_lambda <- 5
-max_lam <- 2
-lambda_values <- seq(0, max_lam, length.out = n_lambda)
+n_lambda <- 25
+max_lam <- 3
 sig_threshold <- 0.03
 pers_threshold <- 0.28
 ```
 
 
 ```{r}
-ret <- peak_persistance_diagram(curves, t_grid, 2, 2, sig_threshold, pers_threshold)
+ret <- peak_persistance_diagram(curves, t_grid, max_lam, n_lambda, sig_threshold, pers_threshold, "tw")
 ```
 Peak-persistance diagram in barchart form
 ```{r}
-#ret$bc
+ret$bc
+```
+Peak-persistance diagram in heatmap form
+```{r}
 ret$surface
+```
+Shape constrained density estimation
+
+```{r}
+opt_idx <- ret$opt_lam_idx
+mfn <- ret$mfn[[opt_idx]]
+peak_locs <- ret$peak_locs[[opt_idx]]
+valley_locs <- ret$valley_locs[[opt_idx]]
+t_grid <- ret$grid
+temp_fun <- template_function(mfn, peak_locs, valley_locs, t_grid)
+temp_fun_tf <- tfd(temp_fun(t_grid), t_grid)
+fun_aligned <- ret$aligned_functions[[opt_idx]]
+
+k = 8
+rho = 1e-9
+basis_type = "Fourier"
+
+fn_est <- shape_constrained_estimation(fun_aligned, temp_fun_tf, peak_locs, valley_locs,
+                             k, t_grid, rho, basis_type)
+
+plot(fn_est, t_grid)
+```
+
+More complex simulated data
+```{r}
+combined_func_complex <- generate_benchmark_function(
+  bases = list(3, "normal", "normal"),  # x^3, normal, normal, sine
+  coefficients = list(
+    1,
+    10,
+    10
+  ),
+  shifts = c(0.5, 0.3, 0.7),     # Shifts for each basis
+  scale_factors = c(2,10, 10)      # Amplitude factors
+)
+
+curve_data_complex <- generate_functional_curves(n = 50,
+                                         num_points = 100,
+                                         g = combined_func,
+                                         warping = "flexible",
+                                         warping_points = 5,
+                                         warping_lambda = 4,
+                                         sigma_amplitude = 0.1,
+                                         scale_factor = 0.01,
+                                         nugget = 0.005,
+                                         seed = 123)
+
+
+plot_simulated_curves(curves = curve_data_complex$curves,
+                      t_grid = curve_data_complex$t_grid,
+                      g = curve_data_complex$base_function)
+```
+```{r}
+t_grid_c <- curve_data$t_grid
+curves_c <- curve_data_complex$curves
+
+n_lambda <- 25
+max_lam <- 3
+sig_threshold <- 0.03
+pers_threshold <- 0.28
+ret <- peak_persistance_diagram(curves_c, t_grid_c, max_lam, n_lambda, sig_threshold, pers_threshold, "tw")
 ```
 
 
+```{r}
+ret$surface
+```
+```{r}
+opt_idx <- ret$opt_lam_idx
+mfn <- ret$mfn[[opt_idx]]
+peak_locs <- ret$peak_locs[[opt_idx]]
+valley_locs <- ret$valley_locs[[opt_idx]]
+t_grid <- ret$grid
+temp_fun <- template_function(mfn, peak_locs, valley_locs, t_grid)
+temp_fun_tf <- tfd(temp_fun(t_grid), t_grid)
+fun_aligned <- ret$aligned_functions[[opt_idx]]
+
+k = 8
+rho = 1e-9
+basis_type = "Fourier"
+
+fn_est <- shape_constrained_estimation(fun_aligned, temp_fun_tf, peak_locs, valley_locs,
+                             k, t_grid, rho, basis_type)
+
+plot(fn_est, t_grid)
+```
+
+```{r}
+plot(fun_aligned, t_grid)
+```
 
