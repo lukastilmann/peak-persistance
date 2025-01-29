@@ -1,3 +1,4 @@
+library(fdasrvf)
 
 align_functions <- function(fun_curves, lambda = 0.0, parallel = FALSE,
                             max_iter = 10,

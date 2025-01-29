@@ -16,7 +16,8 @@ peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 
   curves_d <- tfd(curves, t_grid)
   curves_d_df <- data.frame(curves_d)
   colnames(curves_d_df) <- c("curves")
-  lam_stop <- find_max_lambda(curves_d_df, t_grid, max_lambda, 3, TRUE)
+  lam_stop <- find_max_lambda(curves_d_df, t_grid, max_lambda, threshold = 1e-2,
+                              max_iter = 20, min_bound = 0.01, parallel = TRUE)
   print(paste("Max lambda value: ", lam_stop))
 
   # Grid of lambda values
