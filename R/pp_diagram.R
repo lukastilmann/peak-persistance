@@ -2,7 +2,10 @@ library(fdasrvf)
 
 # creates barchart and surface diagrams tracking peaks of aligned functions
 # for different lambda values
-peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 10,
+peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
+                                     lambda_search_min_bound = 0.01,
+                                     lambda_search_threshold = 1e-3,
+                                     n_lambda = 10,
                                      sig_threshold = 0.03, pers_threshold = 0.28,
                                      align_fun = "tw"){
   # Create dataframe with function curves
@@ -16,8 +19,12 @@ peak_persistance_diagram <- function(curves, t_grid, max_lambda = 2, n_lambda = 
   curves_d <- tfd(curves, t_grid)
   curves_d_df <- data.frame(curves_d)
   colnames(curves_d_df) <- c("curves")
-  lam_stop <- find_max_lambda(curves_d_df, t_grid, max_lambda, threshold = 1e-2,
-                              max_iter = 20, min_bound = 0.01, parallel = TRUE)
+  lam_stop <- find_max_lambda(curves_d_df, t_grid,
+                              start_val = lambda_search_start,
+                              threshold = lambda_search_threshold,
+                              max_iter = 20,
+                              min_bound = lambda_search_min_bound,
+                              parallel = TRUE)
   print(paste("Max lambda value: ", lam_stop))
 
   # Grid of lambda values

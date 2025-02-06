@@ -1,15 +1,3 @@
-```{r}
-source("../R/sim_data.R")
-source("../R/visualization.R")
-source("../R/pp_diagram.R")
-source("../R/utils.R")
-source("../R/find_max_lambda.R")
-source("../R/align_functions.R")
-source("../R/template_function.R")
-source("../R/basis.R")
-source("../R/shape_constrained_estimation.R")
-
-```
 
 ```{r}
 r_files <- list.files(path = "../R/", 
@@ -54,14 +42,21 @@ t_grid <- curve_data$t_grid
 curves <- curve_data$curves
 
 n_lambda <- 25
-max_lam <- 3
+lam_start <- 2
 sig_threshold <- 0.03
 pers_threshold <- 0.28
 ```
 
 
 ```{r}
-ret <- peak_persistance_diagram(curves, t_grid, max_lam, n_lambda, sig_threshold, pers_threshold, "tw")
+ret <- peak_persistance_diagram(curves = curves, 
+                                t_grid = t_grid, 
+                                lambda_search_start = lam_start,
+                                lambda_search_min_bound = 0.01,
+                                lambda_search_threshold = 1e-3,
+                                n_lambda = 25,
+                                sig_threshold = sig_threshold, 
+                                pers_threshold = pers_threshold)
 ```
 Peak-persistance diagram in barchart form
 ```{r}

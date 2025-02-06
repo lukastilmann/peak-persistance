@@ -13,40 +13,61 @@
 #' @param max_iter Maximum number of binary search iterations (default: 20)
 #' @param parallel Logical indicating whether to use parallel processing
 #' @return Lowest lambda value that brings Frobenius norm below threshold
-find_max_lambda <- function(function_curves, t_grid, max_val, threshold = 1e-2,
+find_max_lambda <- function(function_curves, t_grid, start_val, threshold = 1e-2,
                             max_iter = 20, min_bound = 1e-3, parallel = FALSE) {
 
-  mean_unaligned <- mean(function_curves$curves)
+
   # Calculate Frobenius norm for a given lambda
-  calc_frob_norm <- function(lambda) {
+  calc_frob_norm <- function(lambda, norm_factor) {
     aligned <- align_functions(function_curves, lambda = lambda,
                                parallel = parallel, t_grid, func = "tw")
     sqrd_diff <- (mean_unaligned - mean(aligned))^2
-    sqrt(sum(sqrd_diff[, t_grid]))
+    sqrt(sum(sqrd_diff[, t_grid])) * norm_factor
   }
 
-  # Initialize binary search bounds
-  left <- 0
-  right <- max_val
-  lowest_valid <- right  # Initialize to maximum value
+  # Compute inelastic mean and Frobenius norm of
+  mean_unaligned <- mean(function_curves$curves)
+  mean_unaligned_vec <- mean_unaligned[, t_grid]
+  squared_dev <- (mean(mean_unaligned_vec) - mean_unaligned_vec)^2
+  normalizing_factor <- sqrt(sum(squared_dev))
 
-  # Binary search
-  for (i in 1:max_iter) {
-    mid <- (left + right) / 2
-    norm_val <- calc_frob_norm(mid)
+  # Evaluate at start value
+  start_fn <- calc_frob_norm(start_val, normalizing_factor)
+  if (start_fn > threshold){
+    start_i = 1
+    lower_bound <- start_val
+    upper_fn <- start_fn
+    upper_bound <- lower_bound
+    # Search for upper bound
+    while (upper_fn > threshold){
+      upper_bound <- upper_bound * 2
+      upper_fn <- calc_frob_norm(upper_bound, normalizing_factor)
+      start_i = start_i + 1
+    }
+  } else {
+    lower_bound <- 0
+    upper_bound <- start_val
+    lowest_valid <- upper_bound
+    start_i = 1
+  }
 
-    if (norm_val <= threshold) {
+  # Divide and conquer search
+  for (i in start_i:max_iter) {
+    mid <- (upper_bound + lower_bound) / 2
+    mid_fn <- calc_frob_norm(mid, normalizing_factor)
+
+    if (mid_fn <= threshold) {
       # Found a valid lambda, but might not be the lowest
       # Store it and search lower
-      right <- mid
+      upper_bound <- mid
       lowest_valid <- mid
     } else {
       # Current lambda is too small, search higher
-      left <- mid
+      lower_bound <- mid
     }
 
     # Stop if bounds are very close
-    if (abs(right - left) < min_bound) {
+    if (abs(lower_bound - upper_bound) < min_bound) {
       break
     }
   }
