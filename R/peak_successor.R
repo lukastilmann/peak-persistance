@@ -1,6 +1,7 @@
 
 # Finds which labeled peaks are in same location as peak in previous curve
-peak_successor <- function(peaks1, valleys1, peaks2, valleys2, labels1, t_grid) {
+peak_successor <- function(peaks1, valleys1, peaks2, valleys2, labels1,
+                           label_max, t_grid) {
   # Helper function to compute ranges for peaks
   compute_peak_ranges <- function(peaks, valleys) {
     # Ensure valleys include endpoints
@@ -61,11 +62,11 @@ peak_successor <- function(peaks1, valleys1, peaks2, valleys2, labels1, t_grid) 
   # Main function logic
   if(length(peaks1) == 0) {
     # If no peaks in first function, assign new labels to all peaks in second
-    labelMax <- max(labels1, 0)
-    labels2 <- labelMax + seq_along(peaks2)
+    #label_max <- max(labels1, 0)
+    labels2 <- label_max + seq_along(peaks2)
     return(list(
       labels = labels2,
-      labelMax = labelMax + length(peaks2)
+      label_max = label_max + length(peaks2)
     ))
   }
 
@@ -79,16 +80,15 @@ peak_successor <- function(peaks1, valleys1, peaks2, valleys2, labels1, t_grid) 
   labels2 <- resolve_overlapping_labels(labels2, peaks1, peaks2, labels1)
 
   # Assign new labels to unmatched peaks
-  labelMax <- max(labels1)
   unmatched <- which(labels2 == 0)
   if(length(unmatched) > 0) {
-    labels2[unmatched] <- labelMax + seq_along(unmatched)
-    labelMax <- labelMax + length(unmatched)
+    labels2[unmatched] <- label_max + seq_along(unmatched)
+    label_max <- label_max + length(unmatched)
   }
 
   # Return both new labels and updated labelMax
   return(list(
     labels = labels2,
-    labelMax = labelMax
+    label_max = label_max
   ))
 }

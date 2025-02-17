@@ -77,6 +77,8 @@ peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
   all_labels <- list()
   # Labels for first mean function
   all_labels[[col_names[1]]] <- seq_along(all_peaks[[col_names[1]]])
+  max_label = length(all_labels[[col_names[1]]])
+  print(max_label)
 
   # Iterate over consecutive pairs of columns, starting from second column
   for(i in 2:length(all_peaks)) {
@@ -99,11 +101,13 @@ peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
       peaks2 = peaks2,
       valleys2 = valleys2,
       labels1 = labels1,
-      t_grid
+      label_max = max_label,
+      t_grid = t_grid
     )
 
     # Store new labels
     all_labels[[curr_name]] <- result$labels
+    max_label = result$label_max
   }
 
   # Calculate which peaks are significant
