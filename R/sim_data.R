@@ -1,6 +1,7 @@
 library(tidyfun)
 library(ggplot2)
 library(gtools)
+library(MASS)
 
 
 # Flexible function generator for mathematical benchmark functions
@@ -70,7 +71,7 @@ generate_benchmark_function <- function(bases,
 
 # Function to generate boundary-preserving warping functions
 generate_warping_function <- function(n_points = 5,
-                                      lambda = 0,
+                                      gamma = 0,
                                       seed = NULL) {
   # Set seed for reproducibility if provided
   if (!is.null(seed)) set.seed(seed)
@@ -85,7 +86,7 @@ generate_warping_function <- function(n_points = 5,
 
   # Sample increments from Dirichlet distribution
   # Add 1 to each interval size to ensure positive parameters
-  dirichlet_params <- interval_sizes * (1 + lambda)
+  dirichlet_params <- interval_sizes * (1 + gamma)
   increments <- rdirichlet(1, dirichlet_params)[1,]
 
   # Calculate cumulative function values
@@ -100,8 +101,8 @@ generate_warping_function <- function(n_points = 5,
     # Ensure x is within [0, 1]
     x <- pmax(0, pmin(1, x))
 
-    # Use linear interpolation
-    approx(full_points, cumulative_values, xout = x, method = "linear")$y
+    # Monotone cubic spline interpolation
+    splinefun(full_points, cumulative_values, method = "hyman")(x)
   }
 }
 
@@ -111,11 +112,12 @@ generate_functional_curves <- function(n = 50,
                                        num_points = 100,
                                        g,
                                        warping = "simple",
-                                       warping_lambda = 0,
+                                       warping_gamma = 0,
                                        warping_points = 5,
                                        sigma_amplitude = 0.01,
                                        scale_factor = 0.01,
                                        nugget = 0.01,
+                                       noise_to_signal = 0.01,
                                        seed = NULL) {
   # Set seed for reproducibility if provided
   if (!is.null(seed)) set.seed(seed)
@@ -138,7 +140,7 @@ generate_functional_curves <- function(n = 50,
     # Draw random warping function with more flexibility
     grid_warped <- sapply(1:n, function(i){
       generate_warping_function(n_points = warping_points,
-                                lambda = warping_lambda,
+                                gamma = warping_gamma,
                                 seed = seed + i)(t_grid)
     })
   } else {
@@ -148,13 +150,16 @@ generate_functional_curves <- function(n = 50,
   grid_warped <- t(grid_warped)
   warped_values <- tfd(g(grid_warped), t_grid)
 
-  noise <- tf_rgp(n = n,
-                  arg = num_points,
-                  cov = "squareexp",
-                  scale = scale_factor,
-                  nugget = nugget)
+  # Nugget variance as fraction of function variance on per function basis
+  fun_var <- tf_fvar(warped_values, t_grid) * noise_to_signal
+  cov_mat <- matrix(0, length(fun_var), length(fun_var))
+  diag(cov_mat) <- fun_var * noise_to_signal
+  mu <- rep(0, length(fun_var))
+  noise <- MASS::mvrnorm(num_points, mu = mu, Sigma = cov_mat)
+  noise_tf <- tfd(t(noise), t_grid)
 
-  curves <- warped_values * a_params + noise
+  # Final function curves
+  curves <- warped_values * a_params + noise_tf
 
   return(list(
     curves = curves,
@@ -162,7 +167,7 @@ generate_functional_curves <- function(n = 50,
     base_function = g,
     amplitude_params = a_params,
     grid_warped = grid_warped,
-    noise_grid = noise
+    noise_grid = noise_tf
   ))
 
 }

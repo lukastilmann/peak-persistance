@@ -6,6 +6,7 @@ set.seed(123)
 ```
 
 
+Simulating some curves with low noise and plotting them.
 ```{r}
 # Combined function with various bases
 combined_func <- generate_benchmark_function(
@@ -25,29 +26,47 @@ functional_data <- generate_functional_curves(n = 20,
                                               g = combined_func,
                                               warping = "simple",
                                               sigma_amplitude = 0.1,
-                                              scale_factor = 0.01,
-                                              nugget = 0.0001)
+                                              noise_to_signal = 0.025)
 
-```
-
-
-```{r}
 plot_simulated_curves(curves = functional_data$curves, 
                       t_grid = functional_data$t_grid,
                       g = functional_data$base_function)
+
 ```
 
-
+Visualizing impact of various parameters.
 ```{r}
 visualize_parameter_impacts_tf(functional_data)
 ```
+Simulating data with flexible warping function and plotting it.
+```{r}
+functional_data_flex_warp <- generate_functional_curves(n = 20,
+                                              num_points = 100,
+                                              g = combined_func,
+                                              warping = "flexible",
+                                              warping_points = 5,
+                                              warping_gamma = 10,
+                                              sigma_amplitude = 0.1,
+                                              noise_to_signal = 0.05,
+                                              seed = 234)
 
+plot_simulated_curves(curves = functional_data_flex_warp$curves, 
+                      t_grid = functional_data_flex_warp$t_grid,
+                      g = functional_data_flex_warp$base_function)
+```
+Visualizing impact of various parameters.
+```{r}
+visualize_parameter_impacts_tf(functional_data_flex_warp)
+```
+
+
+Sampling some flexible warping functions and visualizing.
 ```{r}
 n_functions <- 20
 t_grid <- seq(0, 1, length.out = 100)
-lambda <- 0
+gamma <- 0
 warping_functions <- lapply(1:n_functions, function(i) {
-  f <- generate_warping_function(n_points = 5, lambda = lambda, seed = i)
+  f <- generate_warping_function(n_points = 5, gamma = gamma, seed = i)
   f(t_grid)
 })
 
@@ -55,12 +74,14 @@ warping_functions_tf <- tfd(warping_functions, t_grid)
 
 visualize_warping_functions(warping_functions_tf)
 ```
+
+And now with higher gamma value, which makes the warping functions less "malicious". 
 ```{r}
 n_functions <- 20
 t_grid <- seq(0, 1, length.out = 100)
-lambda <- 10
+gamma <- 10
 warping_functions <- lapply(1:n_functions, function(i) {
-  f <- generate_warping_function(n_points = 5, lambda = lambda, seed = i)
+  f <- generate_warping_function(n_points = 10, gamma = gamma, seed = i)
   f(t_grid)
 })
 
@@ -68,4 +89,3 @@ warping_functions_tf <- tfd(warping_functions, t_grid)
 
 visualize_warping_functions(warping_functions_tf)
 ```
-
