@@ -5,9 +5,11 @@ library(fdasrvf)
 peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
                                      lambda_search_min_bound = 0.01,
                                      lambda_search_threshold = 1e-3,
+                                     max_lambda_search_steps = 20,
+                                     max_iter = 20,
                                      n_lambda = 10,
-                                     sig_threshold = 0.03, pers_threshold = 0.28,
-                                     align_fun = "tw"){
+                                     sig_threshold = 0.03,
+                                     pers_threshold = 0.28){
   # Create dataframe with function curves
   curves <- tfb(curves, basis = "spline", bs = "bs")
   curves_df <- data.frame(curves)
@@ -15,17 +17,18 @@ peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
 
   # Find max lambda value
   # Needs tf in data representation to compute norms as this is returned by align_functions
-  print("Finding max lambda value")
+  message("\nFinding max lambda value")
   curves_d <- tfd(curves, t_grid)
   curves_d_df <- data.frame(curves_d)
   colnames(curves_d_df) <- c("curves")
   lam_stop <- find_max_lambda(curves_d_df, t_grid,
                               start_val = lambda_search_start,
                               threshold = lambda_search_threshold,
-                              max_iter = 20,
                               min_bound = lambda_search_min_bound,
+                              max_iter = max_iter,
+                              max_search_steps = max_lambda_search_steps,
                               parallel = TRUE)
-  print(paste("Max lambda value: ", lam_stop))
+  message(paste("Max lambda value: ", lam_stop))
 
   # Grid of lambda values
   lambda_values <- seq(0, lam_stop, length.out = n_lambda)
@@ -35,16 +38,31 @@ peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
   col_names <- paste0("aligned_lambda_", formatC(lambda_values, format="f", digits=3))
 
   # Apply align_functions for each lambda and combine results
+  max_iter_current <- max_iter
   aligned_list <- lapply(lambda_values, function(lambda) {
-    print(paste("Alignment for:", lambda))
-    aligned <- align_functions(curves_df, lambda = lambda, parallel = TRUE,
-                               max_iter = 20, t_grid = t_grid,
-                               func = align_fun)
-    return(aligned)
-  })
+    align_result <- align_functions(curves_df, lambda = lambda, parallel = TRUE,
+                                    max_iter = max_iter_current, t_grid = t_grid)
+    if (align_result$converged){
+      return(align_result$aligned_curves)
+    }
+    if (max_iter_current == max_iter){
+      max_iter_current <<- max_iter * 2
+      message("Maximum iterations doubled and trying again.")
+      align_result <- align_functions(curves_df, lambda = lambda, parallel = TRUE,
+                                      max_iter = max_iter_current,
+                                      t_grid = t_grid)
+      if (align_result$converged){
+        return(align_result$aligned_curves)
+      }
+    }
+    message(sprintf("No convergence after %s iterations. Set max_iter higher.",
+                    max_iter_current))
+    return(align_result$aligned_curve)
+    }
+  )
 
   # Convert to dataframe
-  aligned_df<- as.data.frame(aligned_list)
+  aligned_df <- as.data.frame(aligned_list)
   colnames(aligned_df) <- col_names
 
   # Add lambda values as attribute for easy access later
@@ -78,7 +96,6 @@ peak_persistance_diagram <- function(curves, t_grid, lambda_search_start = 2,
   # Labels for first mean function
   all_labels[[col_names[1]]] <- seq_along(all_peaks[[col_names[1]]])
   max_label = length(all_labels[[col_names[1]]])
-  print(max_label)
 
   # Iterate over consecutive pairs of columns, starting from second column
   for(i in 2:length(all_peaks)) {
