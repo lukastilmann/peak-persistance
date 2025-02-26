@@ -1,33 +1,46 @@
+ ---
+ title: "Main functionality"
+ author: "Lukas Tilmann"
+ date: "`r Sys.Date()`"
+ output: rmarkdown::html_vignette
+ vignette: >
+   %\VignetteIndexEntry{Main functionality}
+   %\VignetteEngine{knitr::rmarkdown}
+   %\VignetteEncoding{UTF-8}
+   %\VignetteDepends{tf, ggplot2}
+ ---
 
-```{r}
-r_files <- list.files(path = "../R/", 
-                      pattern = "\\.R$",
-                      full.names = TRUE)  # This returns full file paths
 
-# Source each file using sapply
-s <- sapply(r_files, source)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(PeakPersistance)
+library(tf)
+library(tidyfun)
+library(ggplot2)
 ```
 
 
 ```{r}
 combined_func <- generate_benchmark_function(
-  bases = list(3, "normal", "normal"),  # x^3, normal, normal, sine
+  bases = list(3, "normal", "normal"), 
   coefficients = list(
-    1,
+    2.5,
     10,
     10
   ),
-  shifts = c(0.5, 0.3, 0.7),     # Shifts for each basis
-  scale_factors = c(2,10, 10)      # Amplitude factors
+  shifts = c(0, 0.3, 0.7),     # Shifts for each basis
+  scale_factors = c(1, 10, 10)      # Amplitude factors
 )
 
-curve_data <- generate_functional_curves(n = 50,
+curve_data <- generate_functional_curves(n = 25,
                                          num_points = 100,
                                          g = combined_func,
                                          warping = "simple",
-                                         sigma_amplitude = 0.1,
-                                         scale_factor = 0.1,
-                                         nugget = 0.001,
+                                         sigma_amplitude = 0.01,
+                                         noise_to_signal = 0.002,
                                          seed = 123)
 
 
@@ -35,58 +48,81 @@ plot_simulated_curves(curves = curve_data$curves,
                       t_grid = curve_data$t_grid,
                       g = curve_data$base_function)
 ```
+```{r}
+tau <- find_tau(curve_data$curves, curve_data$t_grid, 15)
+tau
+```
 
 
 ```{r}
 t_grid <- curve_data$t_grid
 curves <- curve_data$curves
 
-n_lambda <- 25
-lam_start <- 2
-sig_threshold <- 0.03
+n_lambda <- 5
+lam_start <- 2.5
+sig_threshold <- tau
 pers_threshold <- 0.28
 ```
 
 
 ```{r}
 ret <- peak_persistance_diagram(curves = curves, 
-                                t_grid = t_grid, 
+                                t_grid = t_grid,
+                                parallel = FALSE,
                                 lambda_search_start = lam_start,
-                                lambda_search_min_bound = 0.01,
+                                lambda_search_min_bound = 0.1,
                                 lambda_search_threshold = 1e-3,
-                                n_lambda = 25,
+                                max_lambda_search_steps = 5,
+                                n_lambda = n_lambda,
+                                max_iter = 5,
                                 sig_threshold = sig_threshold, 
-                                pers_threshold = pers_threshold)
+                                pers_threshold = pers_threshold,
+                                pers_method = "clustering")
 ```
+
 Peak-persistance diagram in barchart form
 ```{r}
 ret$bc
 ```
+
 Peak-persistance diagram in heatmap form
 ```{r}
 ret$surface
 ```
+
 Shape constrained density estimation
 
 ```{r}
-opt_idx <- ret$opt_lam_idx
-mfn <- ret$mfn[[opt_idx]]
-peak_locs <- ret$peak_locs[[opt_idx]]
-valley_locs <- ret$valley_locs[[opt_idx]]
-t_grid <- ret$grid
-temp_fun <- template_function(mfn, peak_locs, valley_locs, t_grid)
-temp_fun_tf <- tfd(temp_fun(t_grid), t_grid)
-fun_aligned <- ret$aligned_functions[[opt_idx]]
+mfn <- ret$mean_function
+peak_locs <- ret$peak_locs
+valley_locs <- ret$valley_locs
+significant_peaks <- ret$significant_peaks
+peak_labels <- ret$labels
+t_grid <- ret$time_grid
+fun_aligned <- ret$aligned_functions
 
 k = 8
-rho = 1e-9
-basis_type = "Fourier"
+rho = 1e-6
+basis_type = "tp"
 
-fn_est <- shape_constrained_estimation(fun_aligned, temp_fun_tf, peak_locs, valley_locs,
-                             k, t_grid, rho, basis_type)
-
-plot(fn_est, t_grid)
+fn_est <- shape_constrained_estimation(fun_aligned, peak_locs, valley_locs, 
+                                       significant_peaks, peak_labels, mfn, k, 
+                                       t_grid, rho, basis_type)
 ```
+
+
+
+```{r}
+vis_df <- data.frame(curves_aligned = fun_aligned, curves_unaligned = curves)
+ground_truth <- tfd(curve_data$base_function(t_grid), t_grid)
+
+ggplot(vis_df, aes(y = fun_aligned)) +
+  geom_spaghetti(alpha = 0.3) +
+  geom_spaghetti(aes(y = fn_est), color = "orange", linewidth = 1.5) +
+  geom_spaghetti(aes(y = mfn), color = "green", linewidth = 1.5) +
+  geom_spaghetti(aes(y = ground_truth), color = "red", linewidth = 1.5)
+```
+
 
 More complex simulated data
 ```{r}
@@ -95,7 +131,7 @@ combined_func_complex <- generate_benchmark_function(
   coefficients = list(
     1,
     10,
-    10
+    3
   ),
   shifts = c(0.5, 0.3, 0.7),     # Shifts for each basis
   scale_factors = c(2,10, 10)      # Amplitude factors
@@ -103,13 +139,12 @@ combined_func_complex <- generate_benchmark_function(
 
 curve_data_complex <- generate_functional_curves(n = 50,
                                          num_points = 100,
-                                         g = combined_func,
+                                         g = combined_func_complex,
                                          warping = "flexible",
                                          warping_points = 5,
-                                         warping_lambda = 4,
+                                         warping_gamma = 5,
                                          sigma_amplitude = 0.1,
-                                         scale_factor = 0.01,
-                                         nugget = 0.005,
+                                         noise_to_signal = 0.002,
                                          seed = 123)
 
 
@@ -118,41 +153,67 @@ plot_simulated_curves(curves = curve_data_complex$curves,
                       g = curve_data_complex$base_function)
 ```
 ```{r}
+tau <- find_tau(curve_data_complex$curves, curve_data_complex$t_grid, 25)
+tau
+```
+
+
+```{r}
 t_grid_c <- curve_data$t_grid
 curves_c <- curve_data_complex$curves
 
-n_lambda <- 25
-max_lam <- 3
-sig_threshold <- 0.03
+n_lambda <- 15
+lam_start <- 2
+sig_threshold <- tau
 pers_threshold <- 0.28
-ret <- peak_persistance_diagram(curves_c, t_grid_c, max_lam, n_lambda, sig_threshold, pers_threshold, "tw")
+ret_c <- peak_persistance_diagram(curves = curves_c, 
+                                t_grid = t_grid,
+                                parallel = FALSE,
+                                lambda_search_start = lam_start,
+                                lambda_search_min_bound = 0.01,
+                                lambda_search_threshold = 1e-3,
+                                n_lambda = 25,
+                                sig_threshold = sig_threshold, 
+                                pers_threshold = pers_threshold)
 ```
 
 
 ```{r}
-ret$surface
+ret_c$surface
 ```
+
 ```{r}
-opt_idx <- ret$opt_lam_idx
-mfn <- ret$mfn[[opt_idx]]
-peak_locs <- ret$peak_locs[[opt_idx]]
-valley_locs <- ret$valley_locs[[opt_idx]]
-t_grid <- ret$grid
-temp_fun <- template_function(mfn, peak_locs, valley_locs, t_grid)
-temp_fun_tf <- tfd(temp_fun(t_grid), t_grid)
-fun_aligned <- ret$aligned_functions[[opt_idx]]
+mfn_c <- ret_c$mean_function
+peak_locs_c <- ret_c$peak_locs
+valley_locs_c <- ret_c$valley_locs
+significant_peaks_c <- ret_c$significant_peaks
+peak_labels_c <- ret_c$labels
+t_grid_c <- ret_c$time_grid
+fun_aligned_c <- ret_c$aligned_functions
 
 k = 8
-rho = 1e-9
-basis_type = "Fourier"
+rho = 1e-7
+basis_type = "tp"
 
-fn_est <- shape_constrained_estimation(fun_aligned, temp_fun_tf, peak_locs, valley_locs,
-                             k, t_grid, rho, basis_type)
+fn_est_c <- shape_constrained_estimation(fun_aligned, peak_locs, valley_locs, 
+                                       significant_peaks, peak_labels, mfn, k, 
+                                       t_grid, rho, basis_type)
+```
 
-plot(fn_est, t_grid)
+
+```{r}
+ground_truth_c <- tf::tfd(curve_data_complex$base_function(t_grid_c), t_grid_c)
+vis_df_c <- data.frame(curves_aligned = fun_aligned_c)
+ggplot(vis_df_c, aes(y = fun_aligned_c)) +
+  geom_spaghetti(alpha = 0.3) +
+  geom_spaghetti(aes(y = fn_est_c), color = "green", linewidth = 1.5) + 
+  geom_spaghetti(aes(y = mfn_c), color = "orange", linewidth = 1.5) +
+  geom_spaghetti(aes(y = ground_truth_c), color = "red", linewidth = 1.5)
+  
 ```
 
 ```{r}
-plot(fun_aligned, t_grid)
+step_2_align <- align_to_mean(curves_c, fn_est_c, t_grid_c, 0)
+plot(step_2_align$aligned_functions, t_grid)
 ```
 

@@ -1,0 +1,41 @@
+Package: PeakPersistance
+Title: Peak-persistance diagrams in R
+Version: 0.1.0
+Authors@R: 
+    person(given = "Lukas",
+           family = "Tilmann",
+           role = c("aut", "cre"),
+           email = "lukastilmann97@gmail.com")
+Description: This package provides tools for analyzing functional data
+    using methods built on the fdasrvf package. It implements several
+    techniques for the analysis and visualization of functional data
+    with a focus on alignment and registration of curves.
+Encoding: UTF-8
+License: MIT
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports:
+    stats,
+    rlang,
+    fdasrvf,
+    tidyfun,
+    tf,
+    dplyr,
+    pracma,
+    NlcOptim,
+    mgcv,
+    MASS,
+    magrittr,
+    gtools,
+    ggplot2,
+    gridExtra,
+    grid
+Suggests: 
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+Depends: 
+    R (>= 3.5.0)
+LazyData: true
