@@ -8,7 +8,7 @@
 #' @param significant_peaks Numeric vector of significant peak indices
 #' @param peak_labels Numeric vector of peak labels
 #' @param mean_function Functional data object representing the mean function
-#' @param basis_dim Integer specifying the basis dimension
+#' @param basis_dim Integer specifying the basis dimension. Default is 8.
 #' @param t_grid Numeric vector representing the time grid
 #' @param rho Numeric smoothness penalty parameter
 #' @param basis_type Character specifying basis type (default: "cr" for cubic regression splines)
@@ -22,7 +22,8 @@
 shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
                                          significant_peaks, peak_labels,
                                          mean_function,
-                                         basis_dim, t_grid, rho, basis_type = "cr") {
+                                         basis_dim = 8, t_grid, rho = 1e-9,
+                                         basis_type = "cr") {
   # Input validation
   if (missing(curve_data)) {
     stop("'curve_data' is required")
@@ -42,14 +43,8 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
   if (missing(mean_function)) {
     stop("'mean_function' is required")
   }
-  if (missing(basis_dim)) {
-    stop("'basis_dim' is required")
-  }
   if (missing(t_grid)) {
     stop("'t_grid' is required")
-  }
-  if (missing(rho)) {
-    stop("'rho' is required")
   }
 
   # Type checking
@@ -135,6 +130,9 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
   peak_locs <- sort(peak_locs)
   split_points <- findInterval(valley_locs, peak_locs)
 
+  print(valley_locs)
+  print(split_points)
+  print(peak_locs)
   tryCatch({
     valley_locs <- tapply(valley_locs, split_points, function(v) {
       v[which.min(mean_function[, v])]
@@ -264,7 +262,6 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
     stop("Optimization failed: ", e$message)
   })
 
-  print(result$convergence)
   # Check if optimization converged
   if (!result$convergence) {
     warning("Optimization did not converge. Results may be suboptimal.")
