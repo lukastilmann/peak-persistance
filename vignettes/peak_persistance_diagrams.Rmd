@@ -195,9 +195,9 @@ k = 8
 rho = 1e-7
 basis_type = "tp"
 
-fn_est_c <- shape_constrained_estimation(fun_aligned, peak_locs, valley_locs, 
-                                       significant_peaks, peak_labels, mfn, k, 
-                                       t_grid, rho, basis_type)
+fn_est_c <- shape_constrained_estimation(fun_aligned_c, peak_locs_c, valley_locs_c, 
+                                       significant_peaks_c, peak_labels_c, mfn_c, k, 
+                                       t_grid_c, rho, basis_type)
 ```
 
 

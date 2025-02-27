@@ -130,9 +130,6 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
   peak_locs <- sort(peak_locs)
   split_points <- findInterval(valley_locs, peak_locs)
 
-  print(valley_locs)
-  print(split_points)
-  print(peak_locs)
   tryCatch({
     valley_locs <- tapply(valley_locs, split_points, function(v) {
       v[which.min(mean_function[, v])]

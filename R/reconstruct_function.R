@@ -14,6 +14,7 @@
 #'
 #' @importFrom mgcv PredictMat
 #' @importFrom stats splinefun
+#' @import tf
 reconstruct_function <- function(param, t_grid, idx, construct_data, smooth_object) {
   # Input validation
   if (missing(param)) {
@@ -74,10 +75,6 @@ reconstruct_function <- function(param, t_grid, idx, construct_data, smooth_obje
     stop("Error computing spline function: ", e$message)
   })
 
-  # # Clip extreme values
-  # spline_fun[spline_fun > 100] <- 100
-  # spline_fun[spline_fun < -100] <- -100
-
   p <- rep(1, length(spline_fun))
   nv <- norm(spline_fun, type = "2") / length(spline_fun)
 
@@ -88,11 +85,9 @@ reconstruct_function <- function(param, t_grid, idx, construct_data, smooth_obje
     exponential_mapping <- cos(nv) * p + sin(nv) * spline_fun / nv
   }
 
-  warping_fun <- cumsum(exponential_mapping^2) * (length(t_grid)-1)^-1
-  warping_fun <- warping_fun / warping_fun[length(warping_fun)]
-
   # Warping time grid
-  t_grid_warped <- t_grid * warping_fun
+  warping_fun <- cumsum(exponential_mapping^2) * (length(t_grid)-1)^-1
+  t_grid_warped <- warping_fun / warping_fun[length(warping_fun)]
 
   # Create function using spline interpolation
   fun_est <- tryCatch({
@@ -103,7 +98,7 @@ reconstruct_function <- function(param, t_grid, idx, construct_data, smooth_obje
 
   # Convert to tf object
   fun_est_tf <- tryCatch({
-    tfd(fun_est, t_grid)
+    tf::tfd(fun_est, t_grid)
   }, error = function(e) {
     stop("Error converting to tf object: ", e$message)
   })
