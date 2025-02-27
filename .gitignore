@@ -1,3 +1,6 @@
+# Benchmark results
+**/results/
+
 # History files
 .Rhistory
 .Rapp.history
