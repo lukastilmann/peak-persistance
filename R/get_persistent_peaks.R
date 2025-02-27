@@ -78,7 +78,7 @@ get_persistent_peaks_clustering <- function(peak_lists) {
 
   # Add dummy peak with no occurences
   occ_data <- c(occurence_counts, 0)
-  if (all(occ_data == 0) || length(unique(occurence_counts)) == 1) {
+  if (all(occ_data == 0) || length(unique(occ_data)) == 1) {
     return(numeric(0))
   }
 
