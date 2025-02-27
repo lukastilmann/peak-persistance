@@ -93,7 +93,7 @@ analyze_mean_function <- function(curves) {
 
   # Return results as a list
   return(list(
-    peaks = peaks[[1]],
+    peaks = peak_loc,
     valleys = valleys[[1]],
     function_mean = curves_mean,
     peak_heights = peak_heights,

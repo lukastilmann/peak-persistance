@@ -158,6 +158,8 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
         return(upper_bound)  # Return the best found so far
       }
     }
+    lower_bound <- 0
+    lowest_valid <- upper_bound
   } else {
     lower_bound <- 0
     upper_bound <- start_val

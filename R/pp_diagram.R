@@ -237,7 +237,6 @@ peak_persistance_diagram <- function(curves, t_grid,
 
   # Labelling peaks
   all_labels <- list()
-  # Labels for first mean function
   all_labels[[col_names[1]]] <- seq_along(all_peaks[[col_names[1]]])
   label_max <- length(all_labels[[col_names[1]]])
 

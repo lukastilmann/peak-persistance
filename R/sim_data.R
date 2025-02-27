@@ -288,9 +288,9 @@ generate_warping_function <- function(n_points = 5,
 #'
 #' # Plot the first 5 curves
 #' plot(curves_data$curves, curves_data$t_grid)
-generate_functional_curves <- function(n = 50,
+generate_functional_curves <- function(g,
+                                       n = 50,
                                        num_points = 100,
-                                       g,
                                        warping = "simple",
                                        warping_gamma = 0,
                                        warping_points = 5,
