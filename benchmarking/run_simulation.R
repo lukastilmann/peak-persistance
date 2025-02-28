@@ -193,7 +193,8 @@ run_simulation <- function(params, function_list, log_file = NULL,
         geom_spaghetti(data = vis_df, aes(y = curves_aligned), alpha = 0.3) +
         geom_spaghetti(data = est_df, aes(y = fn_est), color = "orange", linewidth = 1.5) +
         geom_spaghetti(data = mean_df, aes(y = mfn), color = "green", linewidth = 1.5) +
-        geom_spaghetti(data = truth_df, aes(y = ground_truth), color = "red", linewidth = 1.5)
+        geom_spaghetti(data = truth_df, aes(y = ground_truth), color = "red", linewidth = 1.5) +
+        labs(caption = "red: true, green: mean, orange: shape-constrained")
 
       result$plots$estimates <- plot_fn
 
