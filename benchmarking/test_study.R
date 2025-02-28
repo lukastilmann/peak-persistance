@@ -1,8 +1,10 @@
+devtools::load_all(".") # do not "source" package code - load the package!
+library(tidyfun) # so geom_spaghetti is available
 source("./benchmarking/create_settings.R")
-source("./R/sim_data.R")
 source("./benchmarking/run_simulation.R")
 source("./benchmarking/calculate_benchmark_metrics.R")
 source("./benchmarking/benchmark_study.R")
+
 
 fun_1 <- generate_benchmark_function(list("normal", "normal"),
                                      c(10, 10), c(0.3, 0.7), c(10, 10))
