@@ -29,7 +29,9 @@ calculate_benchmark_metrics <- function(benchmark_result) {
     stop("benchmark_result must be a list")
   }
 
-  required_elements <- c("results", "params", "runtime")
+  required_elements <- c("params", "runtime", "simulated_data", "ppd_result",
+                         "estimated_function", "alignment_to_est",
+                         "al_to_est_warping_functions")
   missing_elements <- setdiff(required_elements, names(benchmark_result))
   if (length(missing_elements) > 0) {
     stop("Missing required elements in benchmark_result: ",
@@ -52,12 +54,12 @@ calculate_benchmark_metrics <- function(benchmark_result) {
   }
 
   # Calculate distance between mean function and ground truth
-  if (!is.null(benchmark_result$results$mean_function) &&
-      !is.null(benchmark_result$results$ground_truth)) {
+  if (!is.null(benchmark_result$ppd_result$mean_function) &&
+      !is.null(benchmark_result$simulated_data$ground_truth)) {
 
-    mean_func <- benchmark_result$results$mean_function
-    ground_truth <- benchmark_result$results$ground_truth
-    t_grid <- benchmark_result$results$curve_data$t_grid
+    mean_func <- benchmark_result$ppd_result$mean_function
+    ground_truth <- benchmark_result$simulated_data$ground_truth
+    t_grid <- benchmark_result$simulated_data$t_grid
 
     # Calculate L2 distance between mean function and ground truth
     # NOTE: right metric?
@@ -70,12 +72,12 @@ calculate_benchmark_metrics <- function(benchmark_result) {
   }
 
   # Calculate distance between estimated function and ground truth
-  if (!is.null(benchmark_result$results$estimated_function) &&
-      !is.null(benchmark_result$results$ground_truth)) {
+  if (!is.null(benchmark_result$estimated_function) &&
+      !is.null(benchmark_result$simulated_data$ground_truth)) {
 
-    est_func <- benchmark_result$results$estimated_function
-    ground_truth <- benchmark_result$results$ground_truth
-    t_grid <- benchmark_result$results$curve_data$t_grid
+    est_func <- benchmark_result$estimated_function
+    ground_truth <- benchmark_result$simulated_data$ground_truth
+    t_grid <- benchmark_result$simulated_data$t_grid
 
     # Calculate L2 distance between estimated function and ground truth
     try({
@@ -88,20 +90,20 @@ calculate_benchmark_metrics <- function(benchmark_result) {
 
   # Calculate warping function distances
   # 1. Distance between original warping functions and PPD warping functions
-  if (!is.null(benchmark_result$results$curve_data$grid_warped) &&
-      !is.null(benchmark_result$results$warping_functions)) {
+  if (!is.null(benchmark_result$simulated_data$warped_grid) &&
+      !is.null(benchmark_result$warping_functions)) {
 
     try({
       # Original warping functions from data generation
-      orig_warping <- benchmark_result$results$curve_data$grid_warped
+      orig_warping <- benchmark_result$simulated_data$warped_grid
       n_curves <- nrow(orig_warping)
-      t_grid <- benchmark_result$results$curve_data$t_grid
+      t_grid <- benchmark_result$simulated_data$t_grid
 
       # Convert to tfd objects for easier computation
       orig_warping_tfd <- tf::tfd(orig_warping, t_grid)
 
       # PPD warping functions
-      ppd_warping <- benchmark_result$results$warping_functions
+      ppd_warping <- benchmark_result$warping_functions
 
       # Calculate mean L2 distance
       warping_diffs <- numeric(n_curves)
@@ -118,20 +120,20 @@ calculate_benchmark_metrics <- function(benchmark_result) {
   }
 
   # 2. Distance between original warping functions and final alignment warping functions
-  if (!is.null(benchmark_result$results$curve_data$grid_warped) &&
-      !is.null(benchmark_result$results$alignment$warping_functions)) {
+  if (!is.null(benchmark_result$simulated_data$warped_grid) &&
+      !is.null(benchmark_result$results$al_to_est_warping_functions)) {
 
     try({
       # Original warping functions from data generation
-      orig_warping <- benchmark_result$results$curve_data$grid_warped
+      orig_warping <- benchmark_result$simulated_data$warped_grid
       n_curves <- nrow(orig_warping)
-      t_grid <- benchmark_result$results$curve_data$t_grid
+      t_grid <- benchmark_result$simulated_data$t_grid
 
       # Convert to tfd objects for easier computation
       orig_warping_tfd <- tf::tfd(orig_warping, t_grid)
 
       # Final alignment warping functions
-      align_warping <- benchmark_result$results$alignment$warping_functions
+      align_warping <- benchmark_result$al_to_est_warping_functions
 
       # Calculate mean L2 distance
       warping_diffs <- numeric(n_curves)

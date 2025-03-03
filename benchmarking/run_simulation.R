@@ -9,10 +9,12 @@
 #' @param save_plots Logical, whether to save plots generated during benchmarking.
 #' @param plot_dir Character, directory to save plots if save_plots is TRUE.
 #'
+#' @importFrom tidyfun geom_spaghetti
+#'
 #' @return A list containing benchmark results, including all relevant data and results.
 run_simulation <- function(params, function_list, log_file = NULL,
                            save_plots = FALSE, plot_dir = NULL,
-                           seed = 123) {
+                           seed = NULL) {
   # Initialize logging
   if (!is.null(log_file)) {
     log_msg <- paste0("Starting benchmark ID ", params$benchmark_id, " - ", format(Sys.time()))
@@ -64,7 +66,11 @@ run_simulation <- function(params, function_list, log_file = NULL,
       }
     }
 
-    gen_params[["seed"]] <- seed
+    # If passed, set seed for data generation process
+    if (!is.null(seed)){
+      gen_params[["seed"]] <- seed
+    }
+
 
     # Generate the curves
     curve_data <- do.call(generate_functional_curves, gen_params)
@@ -72,15 +78,18 @@ run_simulation <- function(params, function_list, log_file = NULL,
     # Store data generation time
     result$runtime$data_generation <- difftime(Sys.time(), data_gen_start, units = "secs")
 
-    # Store the generated data
-    result$results$curve_data <- curve_data
+    # Store simulated data
+    result$simulated_data$curves <- curve_data$curves
+    result$simulated_data$warped_grid <- curve_data$grid_warped
 
-    # Create ground truth function
-    base_function <- result$results$curve_data$base_function
-    t_grid <- result$results$curve_data$t_grid
-
+    # Create and store ground truth function
+    base_function <- curve_data$base_function
+    t_grid <- curve_data$t_grid
     ground_truth <- tfd(base_function(t_grid), t_grid)
-    result$results$ground_truth <- ground_truth
+    result$simulated_data$ground_truth <- ground_truth
+    result$simulated_data$t_grid <- t_grid
+    result$simulated_data$base_function <- base_function
+
 
   }, error = function(e) {
     if (!is.null(log_file)) {
@@ -92,7 +101,7 @@ run_simulation <- function(params, function_list, log_file = NULL,
   })
 
   # Step 2: Run peak persistence analysis
-  if (!is.null(result$results$curve_data)) {
+  if (!is.null(result$simulated_data)) {
     ppd_start <- Sys.time()
 
     tryCatch({
@@ -100,8 +109,8 @@ run_simulation <- function(params, function_list, log_file = NULL,
       ppd_params <- list()
 
       # Add curves and t_grid from curve data
-      ppd_params$curves <- result$results$curve_data$curves
-      ppd_params$t_grid <- result$results$curve_data$t_grid
+      ppd_params$curves <- result$simulated_data$curves
+      ppd_params$t_grid <- result$simulated_data$t_grid
 
       # Check which parameters from params should be passed to peak_persistance_diagram
       ppd_func_params <- names(formals(peak_persistance_diagram))
@@ -118,17 +127,17 @@ run_simulation <- function(params, function_list, log_file = NULL,
       result$runtime$peak_persistence <- difftime(Sys.time(), ppd_start, units = "secs")
 
       # Store the PPD results
-      result$results$ppd_result <- ppd_result
+      result$ppd_result <- ppd_result
 
       # Extract specific elements for easier access
-      result$results$mean_function <- ppd_result$mean_function
-      result$results$warping_functions <- ppd_result$warping_functions
-      result$results$aligned_curves <- ppd_result$aligned_functions
-      result$results$peak_locs <- ppd_result$peak_locs
-      result$results$valley_locs <- ppd_result$valley_locs
-      result$results$num_peaks <- ppd_result$num_peaks
-      result$results$persistent_peaks <- ppd_result$persistent_peaks
-      result$results$lambda_opt <- ppd_result$lambda_opt
+      # result$results$mean_function <- ppd_result$mean_function
+      # result$results$warping_functions <- ppd_result$warping_functions
+      # result$results$aligned_curves <- ppd_result$aligned_functions
+      # result$results$peak_locs <- ppd_result$peak_locs
+      # result$results$valley_locs <- ppd_result$valley_locs
+      # result$results$num_peaks <- ppd_result$num_peaks
+      # result$results$persistent_peaks <- ppd_result$persistent_peaks
+      # result$results$lambda_opt <- ppd_result$lambda_opt
 
       # Store plots
       result$plots$barchart <- ppd_result$bc
@@ -144,19 +153,20 @@ run_simulation <- function(params, function_list, log_file = NULL,
   }
 
   # Step 3: Run shape constrained estimation
-  if (!is.null(result$results$ppd_result)) {
+  if (!is.null(result$ppd_result)) {
     sce_start <- Sys.time()
+
 
     tryCatch({
       # Extract parameters for shape_constrained_estimation
       sce_params <- list(
-        curve_data = result$results$aligned_curves,
-        peak_locs = result$results$peak_locs,
-        valley_locs = result$results$valley_locs,
-        significant_peaks = result$results$ppd_result$significant_peaks,
-        peak_labels = result$results$ppd_result$labels,
-        mean_function = result$results$mean_function,
-        t_grid = result$results$ppd_result$time_grid
+        curve_data = result$ppd_result$aligned_functions,
+        peak_locs = result$ppd_result$peak_locs,
+        valley_locs = result$ppd_result$valley_locs,
+        significant_peaks = result$ppd_result$significant_peaks,
+        peak_labels = result$ppd_result$labels,
+        mean_function = result$ppd_result$mean_function,
+        t_grid = result$ppd_result$time_grid
       )
 
       # Check which parameters from params should be passed to shape_constrained_estimation
@@ -166,6 +176,12 @@ run_simulation <- function(params, function_list, log_file = NULL,
           sce_params[[param]] <- params[[param]]
         }
       }
+      # print(sce_params)
+
+      # # Add this before do.call(shape_constrained_estimation, sce_params)
+      # for (param_name in names(sce_params)) {
+      #   message("Parameter: ", param_name, " - Class: ", paste(class(sce_params[[param_name]]), collapse=", "))
+      # }
 
       # Run shape constrained estimation
       fn_est <- do.call(shape_constrained_estimation, sce_params)
@@ -174,18 +190,18 @@ run_simulation <- function(params, function_list, log_file = NULL,
       result$runtime$shape_constrained_est <- difftime(Sys.time(), sce_start, units = "secs")
 
       # Store the estimated function
-      result$results$estimated_function <- fn_est
+      result$estimated_function <- fn_est
 
       # Plot mean, estimated, and ground truth curve
-      vis_df <- data.frame(result$results$aligned_curves)
+      vis_df <- data.frame(result$ppd_result$aligned_functions)
       colnames(vis_df) <- c("curves_aligned")
-      ground_truth <- result$results$ground_truth
-      truth_df <- data.frame(ground_truth = ground_truth)
+      ground_truth <- result$simulated_data$ground_truth
+      truth_df <- data.frame(result$simulated_data$ground_truth)
       colnames(truth_df) <- c("ground_truth")
-      fn_est <- result$results$estimated_function
+      fn_est <- result$estimated_function
       est_df <- data.frame(fn_est)
       colnames(est_df) <- c("fn_est")
-      mfn <- result$results$mean_function
+      mfn <- result$ppd_result$mean_function
       mean_df <- data.frame(mfn)
       colnames(mean_df) <- c("mfn")
 
@@ -210,14 +226,14 @@ run_simulation <- function(params, function_list, log_file = NULL,
   }
 
   # Step 4: Align original curves to estimated function
-  if (!is.null(result$results$estimated_function) && !is.null(result$results$curve_data)) {
+  if (!is.null(result$estimated_function) && !is.null(result$simulated_data$curves)) {
     align_start <- Sys.time()
 
     tryCatch({
       # Extract parameters
-      original_curves <- result$results$curve_data$curves
-      estimated_function <- result$results$estimated_function
-      t_grid <- result$results$curve_data$t_grid
+      original_curves <- result$simulated_data$curves
+      estimated_function <- result$estimated_function
+      t_grid <- result$simulated_data$t_grid
 
       # Default lambda value
       lambda_align <- 0.1
@@ -237,7 +253,8 @@ run_simulation <- function(params, function_list, log_file = NULL,
       result$runtime$alignment <- difftime(Sys.time(), align_start, units = "secs")
 
       # Store alignment results
-      result$results$alignment <- alignment_result
+      result$alignment_to_est <- alignment_result$aligned_functions
+      result$al_to_est_warping_functions <- alignment_result$warping_functions
 
     }, error = function(e) {
       if (!is.null(log_file)) {
@@ -263,11 +280,11 @@ run_simulation <- function(params, function_list, log_file = NULL,
       }
 
       # Save original curves plot if available
-      if (!is.null(result$results$curve_data)) {
+      if (!is.null(result$simulated_data)) {
         original_plot <- plot_simulated_curves(
-          result$results$curve_data$curves,
-          result$results$curve_data$t_grid,
-          result$results$curve_data$base_function
+          result$simulated_data$curves,
+          result$simulated_data$t_grid,
+          result$simulated_data$base_function
         )
         ggsave(file.path(plot_dir_path, "original_curves.png"), original_plot)
       }

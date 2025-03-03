@@ -46,7 +46,8 @@
 run_benchmark_study <- function(param_grid, function_list,
                                 output_dir = "./benchmarking/results/test",
                                 save_plots = TRUE, parallel_processing = FALSE,
-                                n_cores = 2, seed = 123) {
+                                n_cores = 2, seed = NULL,
+                                runs_per_config = 5) {
   # Input validation
   if (!is.data.frame(param_grid)) {
     stop("param_grid must be a data frame")
@@ -137,20 +138,6 @@ run_benchmark_study <- function(param_grid, function_list,
     if (!is.null(metrics$warping_distances)) {
       for (wd_name in names(metrics$warping_distances)) {
         row_data[[paste0("warping_distances_", wd_name)]] <- metrics$warping_distances[[wd_name]]
-      }
-    }
-
-    # Add peak detection metrics
-    if (!is.null(metrics$peak_detection_metrics)) {
-      for (pd_name in names(metrics$peak_detection_metrics)) {
-        row_data[[paste0("peak_detection_", pd_name)]] <- metrics$peak_detection_metrics[[pd_name]]
-      }
-    }
-
-    # Add alignment scores
-    if (!is.null(metrics$alignment_scores)) {
-      for (as_name in names(metrics$alignment_scores)) {
-        row_data[[paste0("alignment_", as_name)]] <- metrics$alignment_scores[[as_name]]
       }
     }
 

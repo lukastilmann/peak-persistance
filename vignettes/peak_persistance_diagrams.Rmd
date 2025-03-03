@@ -22,7 +22,6 @@ library(tidyfun)
 library(ggplot2)
 ```
 
-
 ```{r}
 combined_func <- generate_benchmark_function(
   bases = list(3, "normal", "normal"), 

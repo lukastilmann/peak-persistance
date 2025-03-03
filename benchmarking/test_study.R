@@ -38,5 +38,6 @@ grid <- create_benchmark_grid(
 
 grid <- grid[1:5,]
 
-benchmark_study <- run_benchmark_study(grid, functions_list, output_dir = "./benchmarking/results/test",
-                    save_plots = TRUE, seed = 123)
+benchmark_study <- run_benchmark_study(grid, functions_list,
+                                       output_dir = "./benchmarking/results/test_3",
+                                       save_plots = TRUE, seed = 123)
