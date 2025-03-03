@@ -41,13 +41,17 @@ find_tau <- function(function_curves, time_grid, percentile, smoothing_f = 0.05)
   if (!is.numeric(percentile) || percentile < 0 || percentile > 100) {
     stop("'percentile' must be a numeric value between 0 and 100")
   }
+  # TODO:  nicer: checkmate::assert_number(percentile, lower = 0, upper = 100)
 
   if (!is.numeric(smoothing_f) || smoothing_f <= 0 || smoothing_f >= 1) {
     stop("'smoothing_f' must be a numeric value between 0 and 1")
   }
+  # TODO: nicer: checkmate::assert_number(smoothing_f, lower = 0, upper = 1)
+  #   also: not really necessary, tf_smooth will check its inputs anyway...
 
   # Smoothing
   function_curves <- tf::tf_smooth(function_curves, "lowess", f = smoothing_f)
+  # TODO:  default smoothing_f seems low?
 
   # Calculating first and second derivative
   slope <- tf::tf_derive(function_curves, order = 1)

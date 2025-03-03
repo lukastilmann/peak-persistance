@@ -61,7 +61,8 @@ peak_persistance_diagram <- function(curves, t_grid,
                                      pers_threshold = 0.28,
                                      pers_method = "clustering") {
 
-  # Input validation
+  #  Input validation:
+  # # TODO:  "missing" checks for args without defaults are not necessary at all, please rm
   if (missing(curves)) {
     stop("'curves' is required")
   }
@@ -73,10 +74,12 @@ peak_persistance_diagram <- function(curves, t_grid,
   }
   if (!is.numeric(t_grid)) {
     stop("'t_grid' must be a numeric vector")
+    # TODO: useless / not sringent enough. has to be a suitable arg vector.
+    #       maybe leave check to tfb/tfd calls below
   }
   if (!is.numeric(lambda_search_start) || lambda_search_start <= 0) {
     stop("'lambda_search_start' must be a positive numeric value")
-  }
+  } # use checkmate::assert_number
   if (!is.numeric(lambda_search_min_bound) || lambda_search_min_bound <= 0) {
     stop("'lambda_search_min_bound' must be a positive numeric value")
   }
@@ -93,6 +96,10 @@ peak_persistance_diagram <- function(curves, t_grid,
   if (!penalty %in% c("roughness", "geodesic", "norm")) {
     stop("penalty must be either 'roughness', 'geodesic', or 'norm'.")
   }
+  # # TODO:  much better pattern:
+  # use arg-list in function definition above, then use match.arg
+  # makes docs easier to understand, tab completion works better, etc
+
   if (!is.numeric(n_lambda) || n_lambda <= 1 || n_lambda != round(n_lambda)) {
     stop("'n_lambda' must be an integer greater than 1")
   }
@@ -104,11 +111,15 @@ peak_persistance_diagram <- function(curves, t_grid,
   }
   if (!pers_method %in% c("clustering", "threshold")) {
     stop("'pers_method' must be either 'clustering' or 'threshold'")
-  }
+  } # TODO: much better pattern: use arg-list in function definition above, then use match.arg
 
   # Create dataframe with function curves
   tryCatch({
     curves <- tfb(curves, basis = "spline", bs = "bs")
+    # TODO: users should be able to set k (basis dimension!) for this
+    # ??: shouldn't this use t_grid?
+    # TODO: bad pattern : don't overwrite function inputs with new objects of same name,
+    #       makes code hard to read
   }, error = function(e) {
     stop("Failed to convert curves using tfb: ", e$message)
   })
@@ -118,6 +129,7 @@ peak_persistance_diagram <- function(curves, t_grid,
   message("\nFinding max lambda value")
   tryCatch({
     curves_d <- tfd(curves, t_grid)
+    # ??: does this always yield regular tfds (& if not do we need to guarantee this)?
   }, error = function(e) {
     stop("Failed to convert curves to tfd format: ", e$message)
   })
@@ -138,6 +150,7 @@ peak_persistance_diagram <- function(curves, t_grid,
   message(paste("Max lambda value: ", lam_stop))
 
   # Grid of lambda values
+  #??: is linear lambda-grid most sensible? what about log- or sqrt-spacing?
   lambda_values <- seq(0, lam_stop, length.out = n_lambda)
 
   # Create column names that incorporate lambda values
