@@ -29,6 +29,8 @@ calculate_benchmark_metrics <- function(benchmark_result) {
     stop("benchmark_result must be a list")
   }
 
+  #print(names(benchmark_result))
+
   required_elements <- c("params", "runtime", "simulated_data", "ppd_result",
                          "estimated_function", "alignment_to_est",
                          "al_to_est_warping_functions")
@@ -47,12 +49,14 @@ calculate_benchmark_metrics <- function(benchmark_result) {
   # Add runtime metrics
   metrics$runtime <- benchmark_result$runtime
 
-  # Check if results exist
-  if (is.null(benchmark_result$results)) {
-    warning("No results found in benchmark_result")
-    return(metrics)
-  }
+  # # Check if results exist
+  # if (is.null(benchmark_result$results)) {
+  #   warning("No results found in benchmark_result")
+  #   return(metrics)
+  # }
 
+  #print(benchmark_result$ppd_result$mean_function)
+  #print(benchmark_result$simulated_data$ground_truth)
   # Calculate distance between mean function and ground truth
   if (!is.null(benchmark_result$ppd_result$mean_function) &&
       !is.null(benchmark_result$simulated_data$ground_truth)) {
@@ -91,7 +95,7 @@ calculate_benchmark_metrics <- function(benchmark_result) {
   # Calculate warping function distances
   # 1. Distance between original warping functions and PPD warping functions
   if (!is.null(benchmark_result$simulated_data$warped_grid) &&
-      !is.null(benchmark_result$warping_functions)) {
+      !is.null(benchmark_result$ppd_result$warping_functions)) {
 
     try({
       # Original warping functions from data generation
@@ -103,7 +107,7 @@ calculate_benchmark_metrics <- function(benchmark_result) {
       orig_warping_tfd <- tf::tfd(orig_warping, t_grid)
 
       # PPD warping functions
-      ppd_warping <- benchmark_result$warping_functions
+      ppd_warping <- benchmark_result$ppd_result$warping_functions
 
       # Calculate mean L2 distance
       warping_diffs <- numeric(n_curves)
@@ -121,7 +125,7 @@ calculate_benchmark_metrics <- function(benchmark_result) {
 
   # 2. Distance between original warping functions and final alignment warping functions
   if (!is.null(benchmark_result$simulated_data$warped_grid) &&
-      !is.null(benchmark_result$results$al_to_est_warping_functions)) {
+      !is.null(benchmark_result$al_to_est_warping_functions)) {
 
     try({
       # Original warping functions from data generation

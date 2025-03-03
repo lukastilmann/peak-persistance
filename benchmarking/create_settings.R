@@ -54,7 +54,7 @@ create_benchmark_grid <- function(..., random_subset = NULL, seed = NULL) {
   }
 
   # Add an ID column for tracking
-  flat_grid$benchmark_id <- 1:nrow(flat_grid)
+  flat_grid$config_id <- 1:nrow(flat_grid)
 
   return(flat_grid)
 }

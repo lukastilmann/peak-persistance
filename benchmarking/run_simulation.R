@@ -129,16 +129,6 @@ run_simulation <- function(params, function_list, log_file = NULL,
       # Store the PPD results
       result$ppd_result <- ppd_result
 
-      # Extract specific elements for easier access
-      # result$results$mean_function <- ppd_result$mean_function
-      # result$results$warping_functions <- ppd_result$warping_functions
-      # result$results$aligned_curves <- ppd_result$aligned_functions
-      # result$results$peak_locs <- ppd_result$peak_locs
-      # result$results$valley_locs <- ppd_result$valley_locs
-      # result$results$num_peaks <- ppd_result$num_peaks
-      # result$results$persistent_peaks <- ppd_result$persistent_peaks
-      # result$results$lambda_opt <- ppd_result$lambda_opt
-
       # Store plots
       result$plots$barchart <- ppd_result$bc
       result$plots$surface <- ppd_result$surface
@@ -176,12 +166,6 @@ run_simulation <- function(params, function_list, log_file = NULL,
           sce_params[[param]] <- params[[param]]
         }
       }
-      # print(sce_params)
-
-      # # Add this before do.call(shape_constrained_estimation, sce_params)
-      # for (param_name in names(sce_params)) {
-      #   message("Parameter: ", param_name, " - Class: ", paste(class(sce_params[[param_name]]), collapse=", "))
-      # }
 
       # Run shape constrained estimation
       fn_est <- do.call(shape_constrained_estimation, sce_params)
