@@ -111,7 +111,7 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
 
   # Filter for significant peaks
   names(peak_locs) <- peak_labels
-  peak_locs <- peak_locs[significant_peaks]
+  peak_locs <- peak_locs[as.character(significant_peaks)]
 
   # Check bounds
   if (mean_function[, t_grid[1]] > mean_function[, t_grid[2]]) {
@@ -241,7 +241,7 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
   }
 
   # Initial values
-  init_val <- c(rep(1e-6, basis_dim), heights)
+  init_val <- c(rep(0, basis_dim), heights)
 
   # Run optimization using fmincon
   result <- tryCatch({
