@@ -139,18 +139,33 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
   normalizing_factor <- 1 / sqrt(sum(squared_deviation))  # Invert to multiply later
 
   # Evaluate at start value
-  start_fn <- calc_frob_norm(start_val, normalizing_factor)
+  fn_val_start <- calc_frob_norm(start_val, normalizing_factor)
 
-  if (start_fn > threshold) {
+  # If start value is not below threshold, search for upper bound
+  if (fn_val_start > threshold) {
     start_i <- 1
-    lower_bound <- start_val
-    upper_fn <- start_fn
-    upper_bound <- lower_bound
+    lower_bound <- 0
+    fn_val_lower_bound <- 1
+    candidate_fn <- fn_val_start
+    candidate <- start_val
 
-    # Search for upper bound
-    while (upper_fn > threshold) {
-      upper_bound <- upper_bound * 2
-      upper_fn <- calc_frob_norm(upper_bound, normalizing_factor)
+    while (candidate_fn > threshold) {
+      # Get new candidate by extrapolating from prev lower bound and evaluated
+      # candidate
+      fn_lower_cand_diff <- fn_val_lower_bound - candidate_fn
+      fn_lower_target_diff <- fn_val_lower_bound - threshold
+      diff_ratio <- (fn_lower_target_diff / fn_lower_cand_diff) - 1
+      interval_diff <- candidate - lower_bound
+
+      # Setting lower bound to old candidate
+      fn_val_lower_bound <- candidate_fn
+      lower_bound <- candidate
+
+      # Evaluating new candidate
+      candidate_new <- candidate + (diff_ratio ^ (1/3)) * interval_diff
+      candidate_fn <- calc_frob_norm(candidate_new, normalizing_factor)
+      candidate <- candidate_new
+
       start_i <- start_i + 1
 
       if (start_i > max_search_steps / 2) {
@@ -158,32 +173,56 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
         return(upper_bound)  # Return the best found so far
       }
     }
-    lower_bound <- 0
-    lowest_valid <- upper_bound
+    # Valid upper bound has been found
+    upper_bound <- candidate_new
+    fn_val_upper_bound <- candidate_fn
+    lowest_valid <- candidate_new
+
   } else {
+    # Start value was below threshold, can start divide and conquer approach
     lower_bound <- 0
+    fn_val_lower_bound <- 1
+
     upper_bound <- start_val
+    fn_val_upper_bound <- fn_val_start
     lowest_valid <- upper_bound
+
     start_i <- 1
   }
 
   # Divide and conquer search
   for (i in start_i:max_search_steps) {
-    mid <- (upper_bound + lower_bound) / 2
-    mid_fn <- calc_frob_norm(mid, normalizing_factor)
+    # Find new candidate by interpolating between bounds
+    # Assumption that curve is roughly proportional to cubic root function
+    fn_bound_diff <- fn_val_lower_bound - fn_val_upper_bound
+    fn_target_lower_diff <- fn_val_lower_bound - threshold
+    diff_ratio <- fn_target_lower_diff / fn_bound_diff
+    bound_diff <- upper_bound - lower_bound
 
-    if (mid_fn <= threshold) {
-      # Found a valid lambda, but might not be the lowest
-      # Store it and search lower
-      upper_bound <- mid
-      lowest_valid <- mid
+    # Making sure step as least as large as min bound
+    if(diff_ratio^3 < 0.5){
+      dist_from_lower <- max(diff_ratio^3 * bound_diff, min_bound)
+      candidate_new <- lower_bound + dist_from_lower
     } else {
-      # Current lambda is too small, search higher
-      lower_bound <- mid
+      dist_from_upper <- max((1 - diff_ratio^3) * bound_diff, min_bound)
+      candidate_new <- upper_bound - dist_from_upper
+    }
+
+    # Evaluate candidate
+    candidate_fn <- calc_frob_norm(candidate_new, normalizing_factor)
+
+    # Check if evaluated value below threshold, set new lowest valid solution if so
+    if (candidate_fn <= threshold){
+      upper_bound <- candidate_new
+      lowest_valid <- candidate_new
+      fn_val_upper_bound <- candidate_fn
+    } else {
+      lower_bound <- candidate_new
+      fn_val_lower_bound <- candidate_fn
     }
 
     # Stop if bounds are very close
-    if (abs(lower_bound - upper_bound) < min_bound) {
+    if (abs(lower_bound - upper_bound) / min_bound <= 1.001) {
       break
     }
   }
