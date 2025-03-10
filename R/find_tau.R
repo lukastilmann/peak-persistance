@@ -9,8 +9,6 @@
 #' @param function_curves A functional data object containing the curves to analyze.
 #' @param time_grid A numeric vector representing the time points or grid on which the functions are evaluated.
 #' @param percentile A numeric value between 0 and 100 specifying the percentile to use for threshold determination.
-#' @param smoothing_f A numeric value between 0 and 1 specifying the smoothing parameter for the lowess function.
-#'        Default is 0.05 (lower values = less smoothing, higher values = more smoothing).
 #'
 #' @return A numeric value representing the threshold (tau) at the specified percentile of normalized curvature values.
 #'
@@ -28,30 +26,17 @@
 #' @examples
 #' \dontrun{
 #' # Assuming functions_data is a functional data object with time_grid
-#' tau <- find_tau(functions_data, time_grid, percentile = 95, smoothing_f = 0.05)
+#' tau <- find_tau(functions_data, time_grid, percentile = 95)
 #' }
 #'
-#' @importFrom tf tf_smooth tf_derive tf_where tf_domain
+#' @importFrom tf tf_derive tf_where tf_domain
 #' @importFrom dplyr lag
 #' @importFrom stats quantile
 #'
 #' @export
-find_tau <- function(function_curves, time_grid, percentile, smoothing_f = 0.05) {
+find_tau <- function(function_curves, time_grid, percentile) {
   # Input validation
-  if (!is.numeric(percentile) || percentile < 0 || percentile > 100) {
-    stop("'percentile' must be a numeric value between 0 and 100")
-  }
-  # TODO:  nicer: checkmate::assert_number(percentile, lower = 0, upper = 100)
-
-  if (!is.numeric(smoothing_f) || smoothing_f <= 0 || smoothing_f >= 1) {
-    stop("'smoothing_f' must be a numeric value between 0 and 1")
-  }
-  # TODO: nicer: checkmate::assert_number(smoothing_f, lower = 0, upper = 1)
-  #   also: not really necessary, tf_smooth will check its inputs anyway...
-
-  # Smoothing
-  function_curves <- tf::tf_smooth(function_curves, "lowess", f = smoothing_f)
-  # TODO:  default smoothing_f seems low?
+  checkmate::assert_number(percentile, lower = 0, upper = 100)
 
   # Calculating first and second derivative
   slope <- tf::tf_derive(function_curves, order = 1)
