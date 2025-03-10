@@ -53,6 +53,7 @@
 #' @export
 peak_persistance_diagram <- function(curves, t_grid,
                                      parallel = TRUE,
+                                     parallel_max_lambda = FALSE,
                                      lambda_search_start = 2,
                                      lambda_search_min_bound = 0.01,
                                      lambda_search_threshold = 1e-3,
@@ -112,7 +113,7 @@ peak_persistance_diagram <- function(curves, t_grid,
                     max_iter = max_iter,
                     penalty = penalty,
                     max_search_steps = max_lambda_search_steps,
-                    parallel = parallel)
+                    parallel = parallel_max_lambda)
   }, error = function(e) {
     stop("Error in find_max_lambda: ", e$message)
   })
