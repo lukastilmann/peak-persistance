@@ -29,8 +29,6 @@ calculate_benchmark_metrics <- function(benchmark_result) {
     stop("benchmark_result must be a list")
   }
 
-  #print(names(benchmark_result))
-
   required_elements <- c("params", "runtime", "simulated_data", "ppd_result",
                          "estimated_function", "alignment_to_est",
                          "al_to_est_warping_functions")
@@ -49,14 +47,6 @@ calculate_benchmark_metrics <- function(benchmark_result) {
   # Add runtime metrics
   metrics$runtime <- benchmark_result$runtime
 
-  # # Check if results exist
-  # if (is.null(benchmark_result$results)) {
-  #   warning("No results found in benchmark_result")
-  #   return(metrics)
-  # }
-
-  #print(benchmark_result$ppd_result$mean_function)
-  #print(benchmark_result$simulated_data$ground_truth)
   # Calculate distance between mean function and ground truth
   if (!is.null(benchmark_result$ppd_result$mean_function) &&
       !is.null(benchmark_result$simulated_data$ground_truth)) {
@@ -150,6 +140,13 @@ calculate_benchmark_metrics <- function(benchmark_result) {
 
       metrics$warping_distances$alignment_warping_mean_distance <- mean(warping_diffs)
       metrics$warping_distances$alignment_warping_sd_distance <- sd(warping_diffs)
+    }, silent = TRUE)
+  }
+
+  if (!is.null(benchmark_result$ppd_result$num_peaks)) {
+
+    try({
+      metrics$num_peaks <- benchmark_result$ppd_result$num_peaks
     }, silent = TRUE)
   }
 

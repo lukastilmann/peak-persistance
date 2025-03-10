@@ -220,7 +220,7 @@ run_simulation <- function(params, function_list, log_file = NULL,
       t_grid <- result$simulated_data$t_grid
 
       # Default lambda value
-      lambda_align <- 0.1
+      lambda_align <- result$ppd_result$lambda_opt
       if ("lambda_align" %in% names(params)) {
         lambda_align <- params$lambda_align
       }
@@ -255,12 +255,20 @@ run_simulation <- function(params, function_list, log_file = NULL,
       plot_dir_path <- file.path(plot_dir, paste0("benchmark_", params$benchmark_id))
       dir.create(plot_dir_path, recursive = TRUE, showWarnings = FALSE)
 
+      # Plot title with info on parameters
+      # Create the beginning of the title
+      filename_prefix <- paste0("benchmark_", params$benchmark_id)
+
       # Save PPD plots if available
       if (!is.null(result$plots$barchart)) {
-        ggsave(file.path(plot_dir_path, "barchart.png"), result$plots$barchart)
+        ggplot2::ggsave(filename = paste0(filename_prefix, "_barchart.png"),
+                        plot = result$plots$barchart,
+                        path = plot_dir_path)
       }
       if (!is.null(result$plots$surface)) {
-        ggsave(file.path(plot_dir_path, "surface.png"), result$plots$surface)
+        ggplot2::ggsave(filename = paste0(filename_prefix, "_surface.png"),
+                        plot = result$plots$surface,
+                        path = plot_dir_path)
       }
 
       # Save original curves plot if available
@@ -270,11 +278,15 @@ run_simulation <- function(params, function_list, log_file = NULL,
           result$simulated_data$t_grid,
           result$simulated_data$base_function
         )
-        ggsave(file.path(plot_dir_path, "original_curves.png"), original_plot)
+        ggplot2::ggsave(filename = paste0(filename_prefix, "_original_curves.png"),
+                        plot = original_plot,
+                        path = plot_dir_path)
       }
 
       if (!is.null(result$plots$estimates)) {
-        ggsave(file.path(plot_dir_path, "estimates.png"), result$plots$estimates)
+        ggplot2::ggsave(filename = paste0(filename_prefix, "_estimates.png"),
+                        plot = result$plots$estimates,
+                        path = plot_dir_path)
       }
 
     }, error = function(e) {

@@ -3,7 +3,7 @@
 #' @description
 #' Executes a complete benchmark study by running multiple benchmarks with different
 #' parameter combinations and calculating metrics. Saves results after each run to
-#' prevent data loss in case of crashes.
+#' prevent data loss in case of crashes, while minimizing storage requirements.
 #'
 #' @param param_grid Data frame containing parameter combinations to benchmark.
 #' @param function_list List of functions to use for data generation.
@@ -48,8 +48,7 @@
 #' @export
 run_benchmark_study <- function(param_grid, function_list,
                                 output_dir = "./benchmarking/results/test",
-                                save_plots = TRUE, parallel_processing = FALSE,
-                                n_cores = 2, seed = NULL,
+                                save_plots = TRUE, seed = NULL,
                                 runs_per_config = 5) {
   # Input validation
   if (!is.data.frame(param_grid)) {
@@ -82,20 +81,38 @@ run_benchmark_study <- function(param_grid, function_list,
   cat("Created expanded parameter grid with ", nrow(expanded_grid), " total runs\n",
       file = log_file, append = TRUE)
 
-  # Create metrics dataframe for incremental saving
+  # File paths for incremental saving
   metrics_df_file <- file.path(output_dir, "metrics_dataframe.rds")
-  results_dir <- file.path(output_dir, "individual_results")
-  dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
+  all_results_file <- file.path(output_dir, "all_benchmark_results.rds")
+  all_metrics_file <- file.path(output_dir, "all_metrics.rds")
 
-  # Check if a previous run exists and load the metrics dataframe
+  # Check if a previous run exists and load the metrics dataframe and previous results
   if (file.exists(metrics_df_file)) {
     metrics_df <- readRDS(metrics_df_file)
     completed_ids <- metrics_df$benchmark_id
     cat("Found existing metrics dataframe with", length(completed_ids), "completed benchmarks\n",
         file = log_file, append = TRUE)
+
+    # Load existing results if available
+    if (file.exists(all_results_file)) {
+      benchmark_results <- readRDS(all_results_file)
+      cat("Loaded existing benchmark results\n", file = log_file, append = TRUE)
+    } else {
+      benchmark_results <- list()
+    }
+
+    # Load existing metrics if available
+    if (file.exists(all_metrics_file)) {
+      all_metrics <- readRDS(all_metrics_file)
+      cat("Loaded existing metrics\n", file = log_file, append = TRUE)
+    } else {
+      all_metrics <- list()
+    }
   } else {
     metrics_df <- data.frame()
     completed_ids <- c()
+    benchmark_results <- list()
+    all_metrics <- list()
   }
 
   # Create plot directory if needed
@@ -126,6 +143,9 @@ run_benchmark_study <- function(param_grid, function_list,
         row_data[[paste0("runtime_", rt_name)]] <- as.numeric(metrics$runtime[[rt_name]])
       }
     }
+
+    # Add number of peaks from peak-persistence-diagram
+    row_data[["num_peaks"]] <- metrics$num_peaks
 
     # Add distances
     row_data[["mean_ground_truth_distance"]] <- metrics$mean_ground_truth_distance
@@ -177,13 +197,10 @@ run_benchmark_study <- function(param_grid, function_list,
       benchmark_result$run_seed <- run_seed
       benchmark_result$run_index <- run_index
       benchmark_result$config_id <- config_id
+      benchmark_result$benchmark_id <- benchmark_id
 
       # Calculate metrics
       metrics <- calculate_benchmark_metrics(benchmark_result)
-
-      # Save individual result
-      saveRDS(benchmark_result, file.path(results_dir, paste0("result_", benchmark_id, ".rds")))
-      saveRDS(metrics, file.path(results_dir, paste0("metrics_", benchmark_id, ".rds")))
 
       # Convert metrics to data frame row
       metrics_row <- metrics_to_df_row(metrics, benchmark_id, run_seed, run_index)
@@ -202,31 +219,28 @@ run_benchmark_study <- function(param_grid, function_list,
   }
 
   # Run the benchmarks (sequentially to ensure reliable incremental saving)
-  all_results <- list()
   for (i in 1:nrow(expanded_grid)) {
     result <- run_single_benchmark(i)
     if (!is.null(result)) {
-      # Add to results list
-      all_results[[length(all_results) + 1]] <- result
+      # Add to results and metrics collections
+      benchmark_results[[length(benchmark_results) + 1]] <- result$result
+      all_metrics[[length(all_metrics) + 1]] <- result$metrics
 
       # Update metrics dataframe
       metrics_df <- rbind(metrics_df, result$metrics_row)
 
-      # Save updated metrics dataframe after each successful run
+      # Save updated files after each successful run
       saveRDS(metrics_df, metrics_df_file)
+      saveRDS(benchmark_results, all_results_file)
+      saveRDS(all_metrics, all_metrics_file)
 
       # Update log
-      cat("Completed benchmark", expanded_grid$benchmark_id[i], "\n", file = log_file, append = TRUE)
+      cat("Completed benchmark", expanded_grid$benchmark_id[i],
+          ", updated checkpoint files\n", file = log_file, append = TRUE)
     }
   }
 
-  # Extract final results
-  benchmark_results <- lapply(all_results, function(r) r$result)
-  all_metrics <- lapply(all_results, function(r) r$metrics)
-
-  # Save final consolidated results
-  saveRDS(benchmark_results, file.path(output_dir, "all_benchmark_results.rds"))
-  saveRDS(all_metrics, file.path(output_dir, "all_metrics.rds"))
+  # Save expanded grid for reference
   saveRDS(expanded_grid, file.path(output_dir, "expanded_param_grid.rds"))
 
   # Save metrics dataframe as CSV for easier analysis
@@ -279,23 +293,17 @@ expand_runs_grid <- function(param_grid, runs_per_config, base_seed = NULL) {
   for (i in 1:nrow(param_grid)) {
     row_data <- param_grid[i, , drop = FALSE]
     orig_config_id <- row_data$config_id
-
     for (j in 1:runs_per_config) {
       # Create a copy of the row
       new_row <- row_data
-
       # Generate a unique random seed for this run
       run_seed <- sample.int(1e6, 1)
-
       # Set run index
       new_row$run_index <- j
-
       # Set run seed
       new_row$run_seed <- run_seed
-
       # Create a unique benchmark_id by combining config_id and run_index
       new_row$benchmark_id <- paste0(orig_config_id, "_", j)
-
       # Add to the list
       expanded_list[[length(expanded_list) + 1]] <- new_row
     }
@@ -304,6 +312,5 @@ expand_runs_grid <- function(param_grid, runs_per_config, base_seed = NULL) {
   # Combine all rows into a single data frame
   expanded_grid <- do.call(rbind, expanded_list)
   rownames(expanded_grid) <- NULL
-
   return(expanded_grid)
 }
