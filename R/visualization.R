@@ -66,14 +66,14 @@ plot_simulated_curves <- function(curves, t_grid, g = NULL) {
     curves_plot <- ggplot2::ggplot(curve_data, ggplot2::aes(y = curves)) +
       tidyfun::geom_spaghetti(alpha = 0.3) +
       tidyfun::geom_spaghetti(ggplot2::aes(y = base_curve), color = "red", linewidth = 1.25) +
-      ggplot2::theme_minimal() +
+      #ggplot2::theme_minimal() +
       ggplot2::labs(title = "Functional Curves with Noise",
                     x = "Time", y = "Value")
   } else {
     # Create plot without base function
     curves_plot <- ggplot2::ggplot(curve_data, ggplot2::aes(y = curves)) +
       tidyfun::geom_spaghetti(alpha = 0.3) +
-      ggplot2::theme_minimal() +
+      #ggplot2::theme_minimal() +
       ggplot2::labs(title = "Functional Curves with Noise",
                     x = "Time", y = "Value")
   }

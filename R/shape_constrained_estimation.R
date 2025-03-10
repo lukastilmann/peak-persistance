@@ -252,17 +252,12 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
       b = b_ineq,                   # Inequality constraint vector
       method = "SQP",               # Sequential Quadratic Programming (like MATLAB)
       tol = 1e-6,                   # Tolerance for convergence
-      maxfeval = 1000000,             # Maximum function evaluations
-      maxiter = 500000
+      maxfeval = 100000,             # Maximum function evaluations
+      maxiter = 50000
     )
   }, error = function(e) {
     stop("Optimization failed: ", e$message)
   })
-
-  # Check if optimization converged
-  if (!result$convergence) {
-    warning("Optimization did not converge. Results may be suboptimal.")
-  }
 
   # Reconstruct final function
   param_est <- result$par

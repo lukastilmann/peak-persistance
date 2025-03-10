@@ -160,6 +160,7 @@ generate_benchmark_function <- function(bases,
 #'
 #' @return A function that takes numeric input(s) in `[0,1]` and returns warped values
 #'         in `[0,1]`.
+#' @importFrom gtools rdirichlet
 #' @export
 #'
 #' @examples

@@ -29,7 +29,11 @@ Imports:
     gtools,
     ggplot2,
     gridExtra,
-    grid
+    grid,
+    doParallel,
+    parallel,
+    foreach,
+    checkmate
 Suggests: 
     testthat (>= 3.0.0),
     knitr,

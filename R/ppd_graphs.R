@@ -76,7 +76,6 @@ create_persistence_diagram_bc <- function(intervals) {
     # Set x-axis to show only the actual peak labels
     ggplot2::scale_x_continuous(breaks = peak_labels,
                                 labels = as.integer(peak_labels)) +
-    ggplot2::theme_minimal() +
     ggplot2::labs(
       title = "Peak Persistence Diagram",
       subtitle = "Vertical bars show lambda ranges where peaks remain significant",
@@ -269,7 +268,8 @@ create_persistance_diagram_sf <- function(t_grid, lambda_values, mean_functions,
   }, error = function(e) {
     stop("Error processing mean functions: ", e$message)
   })
-  # warning thrown here, not sure how to remove
+  names(mfn_list) <- lambda_values
+
   tryCatch({
     mfn_df <- tfd(mfn_list, arg = t_grid)
   }, error = function(e) {
@@ -282,24 +282,29 @@ create_persistance_diagram_sf <- function(t_grid, lambda_values, mean_functions,
     stop("Error creating plot data from mean functions: ", e$message)
   })
 
-  plot_data$lambda <- get_lambda(plot_data$id)
+  # Lambda values as factor so functions are evenly spaces even if lambdas are not
+  plot_data$lambda_factor <- factor(plot_data$id,
+                                    levels = unique(sort(plot_data$id)))
+
   # Create the plot
   plot <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data$arg,
-                                                  y = .data$lambda)) +
+                                                  y = .data$lambda_factor)) +
     ggplot2::geom_tile(ggplot2::aes(fill = .data$value)) +
     # Use viridis color scale (similar to MATLAB's parula)
     ggplot2::scale_fill_viridis_c(
       name = "g(t)",
       option = "viridis"
     ) +
-    # Adjust the aspect ratio to make it look more like MATLAB's output
-    ggplot2::coord_fixed(ratio = diff(range(t_grid)) / diff(range(lambda_values))) +
+    # Original lambda values as labels
+    ggplot2::scale_y_discrete(
+      name = "Lambda",
+      labels = levels(plot_data$lambda_factor)
+    ) +
     # Add labels and theme
     ggplot2::labs(
       x = "t",
       y = "Lambda"
     ) +
-    ggplot2::theme_minimal() +
     # Fine-tune the appearance
     ggplot2::theme(
       legend.position = "right",
@@ -356,24 +361,27 @@ create_persistance_diagram_sf <- function(t_grid, lambda_values, mean_functions,
   }
   # Add peak markers and connections if we have peak data
   if (nrow(peak_data) > 0) {
+    # Y values to factors matching the main plot
+    peak_data$y_factor <- factor(peak_data$y, levels = unique(sort(plot_data$lambda)))
+    label_data$y_factor <- factor(label_data$y, levels = unique(sort(plot_data$lambda)))
+
     plot <- plot +
       # Lines connecting peak positions
       ggplot2::geom_path(data = peak_data,
-                         ggplot2::aes(x = .data$x, y = .data$y, group = .data$group),
+                         ggplot2::aes(x = .data$x, y = .data$y_factor, group = .data$group),
                          color = "grey50",
                          linewidth = 2) +
       # Points marking peak positions
       ggplot2::geom_point(data = peak_data,
-                          ggplot2::aes(x = .data$x, y = .data$y),
+                          ggplot2::aes(x = .data$x, y = .data$y_factor),
                           color = ifelse(peak_data$significant, "black", "grey50"),
                           size = 2) +
       # Add labels at the end of each peak line
       ggplot2::geom_text(data = label_data,
-                         ggplot2::aes(x = .data$x, y = .data$y, label = .data$label),
+                         ggplot2::aes(x = .data$x, y = .data$y_factor, label = .data$label),
                          color = "grey20",
                          size = 4,
                          nudge_x = diff(range(t_grid))/50,  # Slight offset to the right
-                         nudge_y = diff(range(lambda_values))/50,  # Slight offset upward
                          fontface = "bold")
   }
   return(plot)

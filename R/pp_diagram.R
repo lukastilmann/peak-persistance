@@ -47,6 +47,9 @@
 #' }
 #'
 #' @importFrom graphics plot
+#' @importFrom parallel detectCores makeCluster stopCluster clusterExport clusterEvalQ
+#' @importFrom foreach foreach '%dopar%'
+#' @importFrom doParallel registerDoParallel
 #' @export
 peak_persistance_diagram <- function(curves, t_grid,
                                      parallel = TRUE,
@@ -54,75 +57,42 @@ peak_persistance_diagram <- function(curves, t_grid,
                                      lambda_search_min_bound = 0.01,
                                      lambda_search_threshold = 1e-3,
                                      max_lambda_search_steps = 20,
+                                     curvature_percentile = NULL,
+                                     basis_dim = 20,
                                      max_iter = 20,
-                                     penalty = "roughness",
+                                     penalty = c("roughness", "geodesic"),
                                      n_lambda = 10,
+                                     lambda_grid_spacing = 2,
                                      sig_threshold = 0.03,
                                      pers_threshold = 0.28,
-                                     pers_method = "clustering") {
+                                     pers_method = c("clustering", "threshold")) {
 
   #  Input validation:
-  # # TODO:  "missing" checks for args without defaults are not necessary at all, please rm
-  if (missing(curves)) {
-    stop("'curves' is required")
-  }
-  if (!inherits(curves, "tf")) {
-    stop("'curves' must be a tf object from the tidyfun package")
-  }
-  if (missing(t_grid)) {
-    stop("'t_grid' is required")
-  }
-  if (!is.numeric(t_grid)) {
-    stop("'t_grid' must be a numeric vector")
-    # TODO: useless / not sringent enough. has to be a suitable arg vector.
-    #       maybe leave check to tfb/tfd calls below
-  }
-  if (!is.numeric(lambda_search_start) || lambda_search_start <= 0) {
-    stop("'lambda_search_start' must be a positive numeric value")
-  } # use checkmate::assert_number
-  if (!is.numeric(lambda_search_min_bound) || lambda_search_min_bound <= 0) {
-    stop("'lambda_search_min_bound' must be a positive numeric value")
-  }
-  if (!is.numeric(lambda_search_threshold) || lambda_search_threshold <= 0) {
-    stop("'lambda_search_threshold' must be a positive numeric value")
-  }
-  if (!is.numeric(max_lambda_search_steps) || max_lambda_search_steps <= 0 ||
-      max_lambda_search_steps != round(max_lambda_search_steps)) {
-    stop("'max_lambda_search_steps' must be a positive integer")
-  }
-  if (!is.numeric(max_iter) || max_iter <= 0 || max_iter != round(max_iter)) {
-    stop("'max_iter' must be a positive integer")
-  }
-  if (!penalty %in% c("roughness", "geodesic", "norm")) {
-    stop("penalty must be either 'roughness', 'geodesic', or 'norm'.")
-  }
-  # # TODO:  much better pattern:
-  # use arg-list in function definition above, then use match.arg
-  # makes docs easier to understand, tab completion works better, etc
+  checkmate::assert_class(curves, "tf")
+  checkmate::assert_number(lambda_search_start, lower = 0, finite = TRUE)
+  checkmate::assert_number(lambda_search_min_bound, lower = 0, finite = TRUE)
+  checkmate::assert_number(lambda_search_threshold, lower = 0, finite = TRUE)
+  checkmate::assert_count(max_lambda_search_steps, positive = TRUE)
+  checkmate::assert_count(max_iter, positive = TRUE)
+  checkmate::assert_int(n_lambda, lower = 2)
+  checkmate::assert_number(sig_threshold, lower = 0, finite = TRUE)
+  checkmate::assert_number(pers_threshold, lower = 0, upper = 1, finite = TRUE)
 
-  if (!is.numeric(n_lambda) || n_lambda <= 1 || n_lambda != round(n_lambda)) {
-    stop("'n_lambda' must be an integer greater than 1")
-  }
-  if (!is.numeric(sig_threshold) || sig_threshold <= 0) {
-    stop("'sig_threshold' must be a positive numeric value")
-  }
-  if (!is.numeric(pers_threshold) || pers_threshold <= 0 || pers_threshold >= 1) {
-    stop("'pers_threshold' must be a positive numeric value between 0 and 1.")
-  }
-  if (!pers_method %in% c("clustering", "threshold")) {
-    stop("'pers_method' must be either 'clustering' or 'threshold'")
-  } # TODO: much better pattern: use arg-list in function definition above, then use match.arg
+  penalty <- match.arg(penalty)
+  pers_method <- match.arg(pers_method)
 
   # Create dataframe with function curves
   tryCatch({
-    curves <- tfb(curves, basis = "spline", bs = "bs")
-    # TODO: users should be able to set k (basis dimension!) for this
-    # ??: shouldn't this use t_grid?
-    # TODO: bad pattern : don't overwrite function inputs with new objects of same name,
-    #       makes code hard to read
+    curves_b <- tfb(curves, arg = t_grid, basis = "spline",
+                    bs = "bs", k = basis_dim)
   }, error = function(e) {
     stop("Failed to convert curves using tfb: ", e$message)
   })
+
+  # Find significance threshold if curvature_percentile passed
+  if (!is.null(curvature_percentile)){
+    sig_threshold <- find_tau(curves_b, t_grid, curvature_percentile)
+  }
 
   # Find max lambda value
   # Needs tf in data representation to compute norms as this is returned by align_functions
@@ -150,41 +120,118 @@ peak_persistance_diagram <- function(curves, t_grid,
   message(paste("Max lambda value: ", lam_stop))
 
   # Grid of lambda values
-  #??: is linear lambda-grid most sensible? what about log- or sqrt-spacing?
-  lambda_values <- seq(0, lam_stop, length.out = n_lambda)
+  lambda_values <- create_lambda_grid(lam_stop, n_lambda, lambda_grid_spacing)
 
   # Create column names that incorporate lambda values
   # Format: "aligned_lambda_X" where X is the lambda value
-  col_names <- paste0("aligned_lambda_", formatC(lambda_values, format="f", digits=3))
+  col_names <- paste0("aligned_lambda_", format_lambda(lambda_values))
 
-  # Apply align_functions for each lambda and combine results
-  max_iter_current <- max_iter
-  fun_align_result_list <- lapply(lambda_values, function(lambda) {
-    align_result <- tryCatch({
-      align_functions(curves, lambda = lambda, parallel = parallel,
-                      max_iter = max_iter_current, penalty = penalty,
-                      t_grid = t_grid)
-    }, error = function(e) {
-      stop("Error in align_functions with lambda=", lambda, ": ", e$message)
-    })
+  # Set up parallel processing if passed as argument
+  if (parallel) {
+    # Check if parallel package is available
+    if (!requireNamespace("parallel", quietly = TRUE)) {
+      warning("Package 'parallel' is not available. Using sequential processing instead.")
+      parallel <- FALSE
+    } else {
+      # Determine number of cores to use
+      n_cores <- parallel::detectCores() - 1
+      if (n_cores < 1) n_cores <- 1
+      if (n_cores > length(lambda_values)) n_cores <- length(lambda_values)
 
-    if (align_result$converged) {
+      # Create cluster
+      cl <- parallel::makeCluster(n_cores)
+
+      # Export necessary objects and functions to the cluster
+      parallel::clusterExport(cl,
+                              varlist = c("curves_b", "t_grid", "max_iter", "penalty"),
+                              envir = environment())
+
+      # Load required packages on all cluster nodes
+      parallel::clusterEvalQ(cl, {
+        library(tidyfun)
+      })
+
+      # Register the parallel backend with foreach
+      if (requireNamespace("doParallel", quietly = TRUE)) {
+        doParallel::registerDoParallel(cl)
+      } else {
+        warning("Package 'doParallel' is not available. Using sequential processing instead.")
+        parallel <- FALSE
+        parallel::stopCluster(cl)
+      }
+    }
+  }
+
+  # Process each lambda in parallel or sequentially
+  if (parallel && requireNamespace("foreach", quietly = TRUE) &&
+      requireNamespace("doParallel", quietly = TRUE)) {
+
+    # Use foreach to parallelize across lambda values
+    fun_align_result_list <- foreach::foreach(
+      lambda = lambda_values,
+      .export = c("align_functions")
+    ) %dopar% {
+      max_iter_current <- max_iter
+
+      # First attempt with regular max_iter
+      align_result <- tryCatch({
+        align_functions(curves_b, lambda = lambda, parallel = FALSE,
+                        max_iter = max_iter_current, penalty = penalty,
+                        t_grid = t_grid)
+      }, error = function(e) {
+        message("Error in align_functions with lambda=", lambda, ": ", e$message)
+        return(NULL)
+      })
+
+      # If not converged, try with doubled max_iter
+      if (!is.null(align_result) && !align_result$converged) {
+        max_iter_current <- max_iter * 2
+        message("Maximum iterations doubled and trying again for lambda=", lambda)
+
+        align_result <- tryCatch({
+          align_functions(curves_b, lambda = lambda, parallel = FALSE,
+                          max_iter = max_iter_current,
+                          penalty = penalty, t_grid = t_grid)
+        }, error = function(e) {
+          message("Error in align_functions with doubled max_iter for lambda=", lambda, ": ", e$message)
+          return(NULL)
+        })
+
+        if (!is.null(align_result) && !align_result$converged) {
+          message(sprintf("No convergence after %s iterations for lambda=%s. Consider setting max_iter higher.",
+                          max_iter_current, lambda))
+        }
+      }
+
+      if (is.null(align_result)) {
+        # Return empty result in case of error
+        return(list(
+          functions_aligned = NULL,
+          warping_functions = NULL
+        ))
+      }
+
       return(list(
         functions_aligned = align_result$aligned_curves,
         warping_functions = align_result$warping_functions
       ))
     }
 
-    if (max_iter_current == max_iter) {
-      max_iter_current <<- max_iter * 2
-      message("Maximum iterations doubled and trying again.")
+    # Clean up parallel resources
+    parallel::stopCluster(cl)
+
+  } else {
+    # Sequential processing
+
+    fun_align_result_list <- lapply(lambda_values, function(lambda) {
+      max_iter_current <- max_iter
 
       align_result <- tryCatch({
-        align_functions(curves, lambda = lambda, parallel = parallel,
-                        max_iter = max_iter_current,
-                        penalty = penalty, t_grid = t_grid)
+        align_functions(curves_b, lambda = lambda, parallel = FALSE,
+                        max_iter = max_iter_current, penalty = penalty,
+                        t_grid = t_grid)
       }, error = function(e) {
-        stop("Error in align_functions with doubled max_iter: ", e$message)
+        stop("Error in align_functions with lambda=", lambda, ": ", e$message)
       })
 
       if (align_result$converged) {
@@ -193,16 +240,44 @@ peak_persistance_diagram <- function(curves, t_grid,
           warping_functions = align_result$warping_functions
         ))
       }
-    }
 
-    message(sprintf("No convergence after %s iterations. Set max_iter higher.",
-                    max_iter_current))
-    return(list(
-      functions_aligned = align_result$aligned_curves,
-      warping_functions = align_result$warping_functions
-    ))
-  })
+      if (max_iter_current == max_iter) {
+        max_iter_current <- max_iter * 2
+        message("Maximum iterations doubled and trying again for lambda=", lambda)
 
+        align_result <- tryCatch({
+          align_functions(curves_b, lambda = lambda, parallel = FALSE,
+                          max_iter = max_iter_current,
+                          penalty = penalty, t_grid = t_grid)
+        }, error = function(e) {
+          stop("Error in align_functions with doubled max_iter: ", e$message)
+        })
+
+        if (align_result$converged) {
+          return(list(
+            functions_aligned = align_result$aligned_curves,
+            warping_functions = align_result$warping_functions
+          ))
+        }
+      }
+
+      message(sprintf("No convergence after %s iterations for lambda=%s. Set max_iter higher.",
+                      max_iter_current, lambda))
+
+      return(list(
+        functions_aligned = align_result$aligned_curves,
+        warping_functions = align_result$warping_functions
+      ))
+    })
+  }
+
+  # Check for NULL results
+  has_nulls <- any(sapply(fun_align_result_list, function(x) is.null(x$functions_aligned)))
+  if (has_nulls) {
+    warning("Some lambda values failed to produce valid results. Check the messages for details.")
+  }
+
+  # Extract aligned functions and warping functions
   aligned_functions_list <- lapply(fun_align_result_list, function(x) x$functions_aligned)
   warping_functions_list <- lapply(fun_align_result_list, function(x) x$warping_functions)
 
@@ -229,23 +304,85 @@ peak_persistance_diagram <- function(curves, t_grid,
   peak_curvatures <- list()
   peak_heights <- list()
 
-  for(col_name in colnames(aligned_df)) {
-    # Extract curves for this lambda value
-    curves <- aligned_df[[col_name]]
+  # Parallelize the shape information analysis
+  if (parallel && requireNamespace("foreach", quietly = TRUE) &&
+      requireNamespace("doParallel", quietly = TRUE)) {
 
-    # Compute mean functions, find extrema and curvature and height of peaks
-    results <- tryCatch({
-      analyze_mean_function(curves)
-    }, error = function(e) {
-      stop("Error in analyze_mean_function for ", col_name, ": ", e$message)
-    })
+    # Set up parallel cluster
+    n_cores <- parallel::detectCores() - 1
+    if (n_cores < 1) n_cores <- 1
+    if (n_cores > length(col_names)) n_cores <- length(col_names)
+    cl <- parallel::makeCluster(n_cores)
+    doParallel::registerDoParallel(cl)
 
-    # Store results in lists with column name as identifier
-    all_peaks[[col_name]] <- results$peaks
-    all_valleys[[col_name]] <- results$valleys
-    mean_functions[[col_name]] <- results$function_mean
-    peak_curvatures[[col_name]] <- results$peak_curvatures
-    peak_heights[[col_name]] <- results$peak_heights
+    # Export the aligned dataframe to all workers
+    parallel::clusterExport(cl, c("aligned_df"), envir = environment())
+
+    # Parallel processing of shape information
+    results_list <- foreach::foreach(
+      col_name = col_names,
+      .export = c("analyze_mean_function")
+    ) %dopar% {
+      # Extract curves for this lambda value
+      curves_al <- aligned_df[[col_name]]
+
+      # Compute mean functions, find extrema and curvature and height of peaks
+      tryCatch({
+        results <- analyze_mean_function(curves_al)
+        list(
+          col_name = col_name,
+          peaks = results$peaks,
+          valleys = results$valleys,
+          function_mean = results$function_mean,
+          peak_curvatures = results$peak_curvatures,
+          peak_heights = results$peak_heights,
+          success = TRUE
+        )
+      }, error = function(e) {
+        list(
+          col_name = col_name,
+          message = paste("Error in analyze_mean_function for", col_name, ":", e$message),
+          success = FALSE
+        )
+      })
+    }
+
+    # Clean up parallel resources
+    parallel::stopCluster(cl)
+
+    # Process results and handle any errors
+    for (result in results_list) {
+      if (result$success) {
+        col_name <- result$col_name
+        all_peaks[[col_name]] <- result$peaks
+        all_valleys[[col_name]] <- result$valleys
+        mean_functions[[col_name]] <- result$function_mean
+        peak_curvatures[[col_name]] <- result$peak_curvatures
+        peak_heights[[col_name]] <- result$peak_heights
+      } else {
+        stop(result$message)
+      }
+    }
+  } else {
+    # Sequential processing as fallback
+    for(col_name in colnames(aligned_df)) {
+      # Extract curves for this lambda value
+      curves_al <- aligned_df[[col_name]]
+
+      # Compute mean functions, find extrema and curvature and height of peaks
+      results <- tryCatch({
+        analyze_mean_function(curves_al)
+      }, error = function(e) {
+        stop("Error in analyze_mean_function for ", col_name, ": ", e$message)
+      })
+
+      # Store results in lists with column name as identifier
+      all_peaks[[col_name]] <- results$peaks
+      all_valleys[[col_name]] <- results$valleys
+      mean_functions[[col_name]] <- results$function_mean
+      peak_curvatures[[col_name]] <- results$peak_curvatures
+      peak_heights[[col_name]] <- results$peak_heights
+    }
   }
 
   # Labelling peaks
@@ -358,6 +495,7 @@ peak_persistance_diagram <- function(curves, t_grid,
     labels = all_labels[[idx_opt]],
     lambda_opt = opt_lambda,
     num_peaks = num_peaks,
+    sig_threshold = sig_threshold,
     aligned_functions = aligned_df[[col_names[[idx_opt]]]],
     warping_functions = warping_functions_df[[col_names[[idx_opt]]]]
   ))

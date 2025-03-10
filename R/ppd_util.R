@@ -172,3 +172,31 @@ get_peak_intervals <- function(significant_peaks) {
 
   return(label_intervals)
 }
+
+
+#' Format Lambda Values for Display
+#'
+#' @description Formats a vector of lambda values for better readability,
+#'   using scientific notation for very small values and fixed notation for others.
+#'
+#' @param lambda_values Numeric vector of lambda values to format
+#'
+#' @return Character vector of formatted lambda values
+#'
+#' @details Values less than 0.0001 are formatted using scientific notation with 4 digits,
+#'   while larger values use fixed-point notation with 4 decimal places.
+#'
+format_lambda <- function(lambda_values) {
+  result <- character(length(lambda_values))
+  for (i in seq_along(lambda_values)) {
+    # Check if the value is very small (< 0.0001)
+    if (abs(lambda_values[i]) < 0.0001) {
+      # Use scientific notation for very small values
+      result[i] <- formatC(lambda_values[i], format = "e", digits = 4)
+    } else {
+      # Use fixed notation for other values
+      result[i] <- formatC(lambda_values[i], format = "f", digits = 4)
+    }
+  }
+  return(result)
+}
