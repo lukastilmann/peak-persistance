@@ -63,10 +63,10 @@ find_tau <- function(function_curves, time_grid, percentile) {
   })
 
   # Remove empty lists after filtering
-  peak_locs <- peak_locs[sapply(peak_locs, length) > 0]
+  peak_locs_nonempty <- peak_locs[sapply(peak_locs, length) > 0]
 
   # Check if any peaks remain after domain filtering
-  if (length(unlist(peak_locs)) == 0) {
+  if (length(unlist(peak_locs_nonempty)) == 0) {
     warning("No peaks remain after filtering for derivative domain")
     return(0)  # Return a default value when no valid peaks are found
   }
