@@ -1,11 +1,9 @@
 devtools::load_all(".")
-library(tidyfun) # so geom_spaghetti is available
 source("./benchmarking/create_settings.R")
 source("./benchmarking/run_simulation.R")
 source("./benchmarking/calculate_benchmark_metrics.R")
 source("./benchmarking/benchmark_study.R")
 
-t_grid <- seq(0, 1, length.out = 100)
 fun_1 <- generate_benchmark_function(list("normal", "normal"),
                                      c(10, 10), c(0.3, 0.7), c(10, 10))
 
@@ -53,12 +51,12 @@ grid <- create_benchmark_grid(
   ),
   lambda_search_threshold = c(0.1),
   lambda_search_min_bound = c(0.1),
-  curvature_percentile = c(10, 50),
+  curvature_percentile = c(10, 30),
   penalty = c("roughness", "geodesic"),
   lambda_grid_spacing = c("sqrt", "log")
 )
 
 
 benchmark_study <- run_benchmark_study(grid, functions_list,
-                                       output_dir = "./benchmarking/results/test_full",
+                                       output_dir = "./benchmarking/results/study1_results",
                                        save_plots = TRUE, runs_per_config = 5)
