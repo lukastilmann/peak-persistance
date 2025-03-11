@@ -21,10 +21,11 @@
 #' sqrt_grid <- create_lambda_grid(10, n_points = 5, spacing = 2)
 #'
 #' @export
-create_lambda_grid <- function(max_value = 2, n_points = 10, spacing = "log") {
+create_lambda_grid <- function(max_value = 2, n_points = 10,
+                               lambda_grid_spacing = c("log", "sqrt")) {
   # Input validation
   checkmate::assert_number(max_value, lower = 0, finite = TRUE)
-  checkmate::assert_count(n_points, positive = TRUE)
+  spacing <- match.arg(spacing)
 
   # For spacing, check if it's "log" or a positive number
   if (is.character(spacing)) {
@@ -36,9 +37,9 @@ create_lambda_grid <- function(max_value = 2, n_points = 10, spacing = "log") {
   if (spacing == "log") {
     min_value <- 1e-4  # Small positive number close to zero
     return(c(0, exp(seq(log(min_value), log(max_value), length.out = n_points - 1))))
-  } else if (is.numeric(spacing)) {
+  } else {
     # For square root spacing
-    return(seq(0, (max_value)^(1/spacing), length.out = n_points)^spacing)
+    return(seq(0, (max_value)^(1/2), length.out = n_points)^2)
   } else {
     stop("Spacing must be either 'log' or numeric")
   }

@@ -55,7 +55,7 @@ grid <- create_benchmark_grid(
   lambda_search_min_bound = c(0.1),
   curvature_percentile = c(10, 50),
   penalty = c("roughness", "geodesic"),
-  lambda_grid_spacing = c(2, "log")
+  lambda_grid_spacing = c("sqrt", "log")
 )
 
 
