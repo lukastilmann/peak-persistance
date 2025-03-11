@@ -12,12 +12,15 @@ peak_persistance_diagram(
   lambda_search_min_bound = 0.01,
   lambda_search_threshold = 0.001,
   max_lambda_search_steps = 20,
+  curvature_percentile = NULL,
+  basis_dim = 20,
   max_iter = 20,
-  penalty = "roughness",
+  penalty = c("roughness", "geodesic"),
   n_lambda = 10,
+  lambda_grid_spacing = 2,
   sig_threshold = 0.03,
   pers_threshold = 0.28,
-  pers_method = "clustering"
+  pers_method = c("clustering", "threshold")
 )
 }
 \arguments{

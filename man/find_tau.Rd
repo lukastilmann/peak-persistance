@@ -4,7 +4,7 @@
 \alias{find_tau}
 \title{Calculate Significance Threshold for Peak Curvature in Function Curves}
 \usage{
-find_tau(function_curves, time_grid, percentile, smoothing_f = 0.05)
+find_tau(function_curves, time_grid, percentile)
 }
 \arguments{
 \item{function_curves}{A functional data object containing the curves to analyze.}
@@ -12,9 +12,6 @@ find_tau(function_curves, time_grid, percentile, smoothing_f = 0.05)
 \item{time_grid}{A numeric vector representing the time points or grid on which the functions are evaluated.}
 
 \item{percentile}{A numeric value between 0 and 100 specifying the percentile to use for threshold determination.}
-
-\item{smoothing_f}{A numeric value between 0 and 1 specifying the smoothing parameter for the lowess function.
-Default is 0.05 (lower values = less smoothing, higher values = more smoothing).}
 }
 \value{
 A numeric value representing the threshold (tau) at the specified percentile of normalized curvature values.
@@ -41,7 +38,7 @@ with negative values truncated to zero.
 \examples{
 \dontrun{
 # Assuming functions_data is a functional data object with time_grid
-tau <- find_tau(functions_data, time_grid, percentile = 95, smoothing_f = 0.05)
+tau <- find_tau(functions_data, time_grid, percentile = 95)
 }
 
 }

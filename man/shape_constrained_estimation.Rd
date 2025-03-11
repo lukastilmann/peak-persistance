@@ -11,9 +11,9 @@ shape_constrained_estimation(
   significant_peaks,
   peak_labels,
   mean_function,
-  basis_dim,
+  basis_dim = 8,
   t_grid,
-  rho,
+  rho = 1e-09,
   basis_type = "cr"
 )
 }
@@ -30,7 +30,7 @@ shape_constrained_estimation(
 
 \item{mean_function}{Functional data object representing the mean function}
 
-\item{basis_dim}{Integer specifying the basis dimension}
+\item{basis_dim}{Integer specifying the basis dimension. Default is 8.}
 
 \item{t_grid}{Numeric vector representing the time grid}
 

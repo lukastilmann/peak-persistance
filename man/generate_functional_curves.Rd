@@ -5,9 +5,9 @@
 \title{Generate Functional Curves Based on a Benchmark Function}
 \usage{
 generate_functional_curves(
+  g,
   n = 50,
   num_points = 100,
-  g,
   warping = "simple",
   warping_gamma = 0,
   warping_points = 5,
@@ -19,11 +19,11 @@ generate_functional_curves(
 )
 }
 \arguments{
+\item{g}{Function. Base function to be warped and perturbed.}
+
 \item{n}{Integer. Number of curves to generate. Default is 50.}
 
 \item{num_points}{Integer. Number of points in the grid for each curve. Default is 100.}
-
-\item{g}{Function. Base function to be warped and perturbed.}
 
 \item{warping}{Character. Type of warping: "simple" for polynomial warping or
 "flexible" for more complex warping. Default is "simple".}
