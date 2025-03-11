@@ -213,7 +213,8 @@ run_benchmark_study <- function(param_grid, function_list,
       ))
     }, error = function(e) {
       # Log error and continue with next benchmark
-      cat("ERROR in benchmark", benchmark_id, ":", e$message, "\n", file = log_file, append = TRUE)
+      cat("ERROR in benchmark", benchmark_id, ":", e$message, "with seed:",
+          run_seed, "\n", file = log_file, append = TRUE)
       return(NULL)
     })
   }

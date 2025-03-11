@@ -5,7 +5,7 @@ source("./benchmarking/run_simulation.R")
 source("./benchmarking/calculate_benchmark_metrics.R")
 source("./benchmarking/benchmark_study.R")
 
-t_grid <- seq(0, 1, length.out = 1000)
+t_grid <- seq(0, 1, length.out = 100)
 fun_1 <- generate_benchmark_function(list("normal", "normal"),
                                      c(10, 10), c(0.3, 0.7), c(10, 10))
 
@@ -43,7 +43,7 @@ grid <- create_benchmark_grid(
   g_id = c(1, 2, 3),
   n = c(50, 150),
   noise_to_signal = c(0.001, 0.04),
-  amplitude_sigma = c(0.1, 0.4),
+  sigma_amplitude = c(0.1, 0.4),
   warping = list(
     simple = list(),
     flexible = list(
@@ -55,7 +55,7 @@ grid <- create_benchmark_grid(
   lambda_search_min_bound = c(0.1),
   curvature_percentile = c(10, 50),
   penalty = c("roughness", "geodesic"),
-  lambda_spacing = c(2, "log")
+  lambda_grid_spacing = c(2, "log")
 )
 
 

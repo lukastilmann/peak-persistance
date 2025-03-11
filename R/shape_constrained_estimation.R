@@ -128,6 +128,7 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
 
   # Find deepest valley between consecutive peaks
   peak_locs <- sort(peak_locs)
+  valley_locs <- sort(valley_locs)
   split_points <- findInterval(valley_locs, peak_locs)
 
   tryCatch({
