@@ -1,0 +1,762 @@
+---
+title: "study_1_analysis_prelim"
+output: html_document
+---
+
+# Benchmark Study Preliminary Analysis
+
+This analysis explores impact of various data and model parameters on quality of results.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(patchwork)
+library(knitr)
+library(broom)
+library(patchwork)
+library(tidyfun)
+library(kableExtra)
+library(gridExtra)
+```
+
+## Data Loading and Preparation
+
+```{r load-data}
+# Load benchmark data (adjust path as needed)
+benchmark_data <- read.csv("../data/metrics_dataframe_study_1.csv")
+
+
+# Convert all model and data parameters to factors
+benchmark_data$g_id <- as.factor(benchmark_data$g_id)
+benchmark_data$warping <- as.factor(benchmark_data$warping)
+benchmark_data$penalty <- as.factor(benchmark_data$penalty)
+benchmark_data$lambda_grid_spacing <- as.factor(benchmark_data$lambda_grid_spacing)
+benchmark_data$n <- as.factor(benchmark_data$n)
+benchmark_data$noise_to_signal <- as.factor(benchmark_data$noise_to_signal)
+benchmark_data$sigma_amplitude <- as.factor(benchmark_data$sigma_amplitude)
+benchmark_data$warping_gamma <- as.factor(benchmark_data$warping_gamma)
+benchmark_data$warping_points <- as.factor(benchmark_data$warping_points)
+benchmark_data$curvature_percentile <- as.factor(benchmark_data$curvature_percentile)
+```
+
+Distances need to be normalized as functions have different variances. Also computing correct number of peaks for functions.
+```{r pre-processing}
+devtools::load_all(".")
+
+# Define the template functions as they were in the benchmark study
+fun_1 <- generate_benchmark_function(list("normal", "normal"),
+                                     c(10, 10), c(0.3, 0.7), c(10, 10))
+
+fun_2 <- generate_benchmark_function(
+  bases = list("normal", "normal", "normal", "normal"),  
+  coefficients = list(
+    10,
+    5,
+    3,
+    7# Coefficient for sine
+  ),
+  shifts = c(0.2, 0.5, 0.7, 0.9),     # Shifts for each basis
+  scale_factors = c(15, 10, 20, 10)      # Amplitude factors
+)
+
+fun_3 <- generate_benchmark_function(
+  bases = list("sine", "normal", "normal", "normal", "normal"),
+  coefficients = list(
+    10,
+    -30,
+    -30,
+    -30,
+    -30
+  ),
+  shifts = c(0.8, 0.09, 0.35, 0.6, 0.85),
+  scale_factors = c(25, 75, 75, 75, 75)
+)
+
+# Create a grid for evaluation
+t_grid <- seq(0, 1, length.out = 100)
+
+# Convert to tidyfun objects, similar to how they're used in the benchmark
+f1_tf <- tfd(fun_1(t_grid), arg = t_grid)
+f2_tf <- tfd(fun_2(t_grid), arg = t_grid)
+f3_tf <- tfd(fun_3(t_grid), arg = t_grid)
+
+# Calculate variance using tf_fvar (functional variance) as used in the benchmark
+f1_var <- tf_fvar(f1_tf, t_grid)
+f2_var <- tf_fvar(f2_tf, t_grid)
+f3_var <- tf_fvar(f3_tf, t_grid)
+
+# Store variances in a named vector for easy lookup
+function_variances <- c(
+  "1" = f1_var,
+  "2" = f2_var,
+  "3" = f3_var
+)
+
+# Find peaks using the same methodology as analyze_mean_function in the benchmark
+count_peaks <- function(f_tf) {
+  # Calculate derivatives
+  slope <- tf_derive(f_tf, order = 1)
+  
+  # Find peaks (local maxima) - where slope changes from positive to negative
+  peaks <- tf_where(
+    slope,
+    value < 0 & dplyr::lag(value, 1, value[1]) > 0)
+  
+  # Return number of peaks and their locations
+  return(length(peaks[[1]]))
+}
+
+# Count peaks for each function
+f1_num_peaks <- count_peaks(f1_tf)
+f2_num_peaks <- count_peaks(f2_tf)
+f3_num_peaks <- count_peaks(f3_tf)
+
+# Store peak counts in a named vector for easy lookup
+function_peaks <- c(
+  "1" = f1_num_peaks,
+  "2" = f2_num_peaks,
+  "3" = f3_num_peaks
+)
+```
+
+```{r pre-processing-2}
+# Add normalized columns to the benchmark data
+benchmark_data <- benchmark_data %>%
+  mutate(
+    # Convert g_id to character for lookup
+    g_id_chr = as.character(g_id),
+    
+    # Create normalized distance metrics
+    normalized_mean_distance = mean_ground_truth_distance / sqrt(function_variances[g_id_chr]),
+    normalized_est_distance = est_ground_truth_distance / sqrt(function_variances[g_id_chr]),
+    
+    # Calculate peak detection error
+    true_num_peaks = function_peaks[g_id_chr],
+    peak_detection_error = abs(num_peaks - true_num_peaks)
+  )
+
+# Convert g_id to factor for better analysis
+benchmark_data$g_id <- as.factor(benchmark_data$g_id)
+
+# Preview the new columns
+head(benchmark_data %>% select(g_id, mean_ground_truth_distance, normalized_mean_distance, 
+                              est_ground_truth_distance, normalized_est_distance,
+                              num_peaks, true_num_peaks, peak_detection_error))
+
+
+```
+
+```{r}
+# Preview the data
+head(benchmark_data, n = 25) %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                font_size = 11)
+
+```
+
+
+## 1. Visualizing the Impact of Data Parameters
+
+### 1.1 Function Type (g_id)
+
+```{r g-id-impact}
+# Plot performance metrics by function type
+p1 <- ggplot(benchmark_data, aes(x = g_id, y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = g_id), alpha = 0.7) +
+  labs(title = "Normalized Mean Function Distance by Function Type",
+       x = "Function Type (g_id)", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = g_id, y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = g_id), alpha = 0.7) +
+  labs(title = "Normalized Estimated Function Distance by Function Type",
+       x = "Function Type (g_id)", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = g_id, y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = g_id), alpha = 0.7) +
+  labs(title = "Warping Distance by Function Type",
+       x = "Function Type (g_id)", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = g_id, y = peak_detection_error)) +
+  geom_boxplot(aes(fill = g_id), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Function Type",
+       x = "Function Type (g_id)", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots in a 2x2 grid
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+### 1.2 Sample Size (n)
+
+```{r n-impact}
+# Plot performance metrics by sample size
+p1 <- ggplot(benchmark_data, aes(x = n, y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(n)), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Sample Size",
+       x = "Sample Size (n)", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = n, y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = as.factor(n)), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Sample Size",
+       x = "Sample Size (n)", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = n, y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(n)), alpha = 0.7) +
+  labs(title = "Warping Distance by Sample Size",
+       x = "Sample Size (n)", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = n, y = peak_detection_error)) +
+  geom_boxplot(aes(fill = as.factor(n)), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Sample Size",
+       x = "Sample Size (n)", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+### 1.3 Noise Level (noise_to_signal)
+
+```{r noise-impact}
+# Plot performance metrics by noise level
+p1 <- ggplot(benchmark_data, aes(x = as.factor(noise_to_signal), y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(noise_to_signal)), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Noise Level",
+       x = "Noise to Signal Ratio", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = as.factor(noise_to_signal), y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = as.factor(noise_to_signal)), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Noise Level",
+       x = "Noise to Signal Ratio", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = as.factor(noise_to_signal), y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(noise_to_signal)), alpha = 0.7) +
+  labs(title = "Warping Distance by Noise Level",
+       x = "Noise to Signal Ratio", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = as.factor(noise_to_signal), y = peak_detection_error)) +
+  geom_boxplot(aes(fill = as.factor(noise_to_signal)), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Noise Level",
+       x = "Noise to Signal Ratio", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+### 1.4 Amplitude Variation (sigma_amplitude)
+
+```{r amplitude-impact}
+# Plot performance metrics by amplitude variation
+p1 <- ggplot(benchmark_data, aes(x = as.factor(sigma_amplitude), y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(sigma_amplitude)), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Amplitude Variation",
+       x = "Amplitude Variation (sigma)", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = as.factor(sigma_amplitude), y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = as.factor(sigma_amplitude)), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Amplitude Variation",
+       x = "Amplitude Variation (sigma)", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = as.factor(sigma_amplitude), y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(sigma_amplitude)), alpha = 0.7) +
+  labs(title = "Warping Distance by Amplitude Variation",
+       x = "Amplitude Variation (sigma)", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = as.factor(sigma_amplitude), y = peak_detection_error)) +
+  geom_boxplot(aes(fill = as.factor(sigma_amplitude)), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Amplitude Variation",
+       x = "Amplitude Variation (sigma)", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+### 1.5 Warping Method
+
+```{r warping-impact}
+# Plot performance metrics by warping method
+p1 <- ggplot(benchmark_data, aes(x = warping, y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = warping), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Warping Method",
+       x = "Warping Method", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = warping, y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = warping), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Warping Method",
+       x = "Warping Method", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = warping, y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = warping), alpha = 0.7) +
+  labs(title = "Warping Distance by Warping Method",
+       x = "Warping Method", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = warping, y = peak_detection_error)) +
+  geom_boxplot(aes(fill = warping), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Warping Method",
+       x = "Warping Method", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+## 2. Impact of Model Parameters - Same Analysis for Model Parameters
+
+### 2.1 Penalty
+
+```{r penalty-impact}
+# Plot performance metrics by penalty type
+p1 <- ggplot(benchmark_data, aes(x = penalty, y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = penalty), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Penalty Type",
+       x = "Penalty Type", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = penalty, y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = penalty), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Penalty Type",
+       x = "Penalty Type", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = penalty, y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = penalty), alpha = 0.7) +
+  labs(title = "Warping Distance by Penalty Type",
+       x = "Penalty Type", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = penalty, y = peak_detection_error)) +
+  geom_boxplot(aes(fill = penalty), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Penalty Type",
+       x = "Penalty Type", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+```
+
+### 2.2 Lambda Grid Spacing
+```{r spacing-impact}
+
+# Plot performance metrics by lambda grid spacing
+p1 <- ggplot(benchmark_data, aes(x = lambda_grid_spacing, y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = lambda_grid_spacing), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Lambda Grid Spacing",
+       x = "Lambda Grid Spacing", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = lambda_grid_spacing, y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = lambda_grid_spacing), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Lambda Grid Spacing",
+       x = "Lambda Grid Spacing", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = lambda_grid_spacing, y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = lambda_grid_spacing), alpha = 0.7) +
+  labs(title = "Warping Distance by Lambda Grid Spacing",
+       x = "Lambda Grid Spacing", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = lambda_grid_spacing, y = peak_detection_error)) +
+  geom_boxplot(aes(fill = lambda_grid_spacing), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Lambda Grid Spacing",
+       x = "Lambda Grid Spacing", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+```
+
+### 2.3 Curvature Percentile
+```{r curvature-impact}
+# Plot performance metrics by curvature percentile
+p1 <- ggplot(benchmark_data, aes(x = as.factor(curvature_percentile), y = normalized_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(curvature_percentile)), alpha = 0.7) +
+  labs(title = "Normalized Mean Distance by Curvature Percentile",
+       x = "Curvature Percentile", 
+       y = "Normalized Mean Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p2 <- ggplot(benchmark_data, aes(x = as.factor(curvature_percentile), y = normalized_est_distance)) +
+  geom_boxplot(aes(fill = as.factor(curvature_percentile)), alpha = 0.7) +
+  labs(title = "Normalized Estimated Distance by Curvature Percentile",
+       x = "Curvature Percentile", 
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p3 <- ggplot(benchmark_data, aes(x = as.factor(curvature_percentile), y = warping_distances_ppd_warping_mean_distance)) +
+  geom_boxplot(aes(fill = as.factor(curvature_percentile)), alpha = 0.7) +
+  labs(title = "Warping Distance by Curvature Percentile",
+       x = "Curvature Percentile", 
+       y = "Warping Distance") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p4 <- ggplot(benchmark_data, aes(x = as.factor(curvature_percentile), y = peak_detection_error)) +
+  geom_boxplot(aes(fill = as.factor(curvature_percentile)), alpha = 0.7) +
+  labs(title = "Peak Detection Error by Curvature Percentile",
+       x = "Curvature Percentile", 
+       y = "Peak Detection Error") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+```
+
+
+
+## 3. Regression Models for Impact of Variables on Various Metrics
+
+### Model 1: Mean Function Distance from Original Function
+```{r model-mean-distance}
+model_norm_mean <- lm(normalized_mean_distance ~ g_id + n + noise_to_signal + 
+                      sigma_amplitude + warping + penalty + lambda_grid_spacing, 
+                      data = benchmark_data)
+
+# Model summary
+summary_norm_mean <- summary(model_norm_mean)
+
+# Tidy model output for better display
+tidy_norm_mean <- tidy(model_norm_mean, conf.int = TRUE)
+
+# Display results
+kable(tidy_norm_mean, caption = "Regression Model for Normalized Mean Distance", digits = 4)
+```
+
+### Model 2: Estimated function Distance from Original Function
+
+```{r model-est-distance}
+# Fit model for normalized estimated distance
+model_norm_est <- lm(normalized_est_distance ~ g_id + n + noise_to_signal + 
+                     sigma_amplitude + warping + penalty + lambda_grid_spacing, 
+                     data = benchmark_data)
+
+# Model summary
+summary_norm_est <- summary(model_norm_est)
+
+# Tidy model output for better display
+tidy_norm_est <- tidy(model_norm_est, conf.int = TRUE)
+
+# Display results
+kable(tidy_norm_est, caption = "Regression Model for Normalized Estimated Distance", digits = 4)
+```
+
+### Model 3: Distance Between Warping Functions from Peak-Persistence-Diagram and Original Warping Functions
+
+```{r model-warping-distance}
+# Fit model for warping mean distance
+model_warp <- lm(warping_distances_ppd_warping_mean_distance ~ g_id + n + noise_to_signal + 
+                 sigma_amplitude + warping + penalty + lambda_grid_spacing, 
+                 data = benchmark_data)
+
+# Model summary
+summary_warp <- summary(model_warp)
+
+# Tidy model output for better display
+tidy_warp <- tidy(model_warp, conf.int = TRUE)
+
+# Display results
+kable(tidy_warp, caption = "Regression Model for Warping Mean Distance", digits = 4)
+```
+
+
+### Model 4: Model with Interaction Effects between Model and Data Parameters for 
+###          Distance between Mean and Original Function
+
+```{r interactions-model}
+
+# Model with interactions between data and model params for normalized mean distance
+model_norm_mean_int <- lm(normalized_mean_distance ~ 
+                          # Main effects for all parameters
+                          g_id + n + noise_to_signal + sigma_amplitude + 
+                          warping + penalty + lambda_grid_spacing + curvature_percentile +
+                          # Interactions between data and model parameters
+                          g_id:(penalty + lambda_grid_spacing + curvature_percentile) +
+                          n:(penalty + lambda_grid_spacing + curvature_percentile) +
+                          noise_to_signal:(penalty + lambda_grid_spacing + curvature_percentile) +
+                          sigma_amplitude:(penalty + lambda_grid_spacing + curvature_percentile) +
+                          warping:(penalty + lambda_grid_spacing + curvature_percentile),
+                          data = benchmark_data)
+
+# Compare models using ANOVA
+anova_mean <- anova(model_norm_mean, model_norm_mean_int)
+
+# Display ANOVA results
+kable(anova_mean, caption = "ANOVA: Comparison of Mean Distance Models", digits = 4)
+
+# Get top significant interactions for each model
+top_interactions <- function(model, n = 10) {
+  tidied <- tidy(model) %>%
+    filter(grepl(":", term)) %>%
+    arrange(p.value) %>%
+    head(n)
+  return(tidied)
+}
+
+top_int_mean <- top_interactions(model_norm_mean_int)
+
+# Display top interactions
+kable(top_int_mean, caption = "Top Significant Interactions - Mean Distance Model", digits = 4)
+```
+
+## 4. Analysis of Difference between Mean and Shape-constrained Estimate Function
+
+```{r estimation-improvement}
+
+# Compare normalized mean distance and normalized estimated distance
+comparison_data <- benchmark_data %>%
+  mutate(
+    # Calculate change (positive values = worse performance)
+    percent_change = (normalized_est_distance - normalized_mean_distance) / normalized_mean_distance
+  )
+
+# Summary statistics of change
+change_summary <- comparison_data %>%
+  summarize(
+    mean_change = mean(percent_change, na.rm = TRUE),
+    median_change = median(percent_change, na.rm = TRUE),
+    min_change = min(percent_change, na.rm = TRUE),
+    max_change = max(percent_change, na.rm = TRUE),
+    sd_change = sd(percent_change, na.rm = TRUE)
+  )
+
+# Print summary table
+kable(change_summary, caption = "Summary of Change from Mean Function Distance to Estimated Distance", 
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                font_size = 11)
+
+# Plot distribution of percentage change
+p_hist <- ggplot(comparison_data, aes(x = percent_change)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Distribution of Change",
+       x = "Change",
+       y = "Count") +
+  theme_minimal()
+
+# Plot paired comparison
+p_paired <- ggplot(comparison_data, aes(x = normalized_mean_distance, y = normalized_est_distance)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Paired Comparison of Normalized Distances",
+       subtitle = "Points below the line indicate better performance with estimated function",
+       x = "Normalized Mean Distance",
+       y = "Normalized Estimated Distance") +
+  theme_minimal() +
+  coord_equal()
+
+# Arrange the plots side by side
+grid.arrange(p_hist, p_paired, ncol = 2)
+
+# Perform paired t-test
+t_test_result <- t.test(
+  comparison_data$normalized_est_distance,
+  comparison_data$normalized_mean_distance,
+  paired = TRUE,
+  alternative = "less"  # Test if estimated distance is significantly less than mean distance
+)
+
+# Print test results
+cat("Paired t-test results:\n")
+print(t_test_result)
+
+# Perform non-parametric Wilcoxon signed-rank test (doesn't assume normality)
+wilcox_test_result <- wilcox.test(
+  comparison_data$normalized_est_distance,
+  comparison_data$normalized_mean_distance,
+  paired = TRUE,
+  alternative = "less"
+)
+
+cat("\nWilcoxon signed-rank test results:\n")
+print(wilcox_test_result)
+
+# Analyze change by function type
+change_by_function <- comparison_data %>%
+  group_by(g_id) %>%
+  summarize(
+    mean_change = mean(percent_change, na.rm = TRUE),
+    median_change = median(percent_change, na.rm = TRUE),
+    n_samples = n()
+  ) %>%
+  arrange(mean_change)
+
+kable(change_by_function, caption = "Change by Function Type (g_id)", 
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                font_size = 11)
+
+# Box plot of change by function type
+p_change_by_function <- ggplot(comparison_data, aes(x = g_id, y = percent_change, fill = g_id)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Change by Function Type",
+       x = "Function Type (g_id)",
+       y = "Change") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+print(p_change_by_function)
+
+```
+
+## 5. Drilldown on Effect of Model Parameters by Most Important Data Parameters (Function and Warping Type)
+
+
+```{r}
+# Create interaction plots for g_id and penalty
+interaction_penalty_g_id <- ggplot(benchmark_data, aes(x = g_id, y = normalized_mean_distance, fill = penalty)) +
+  geom_boxplot(position = position_dodge(width = 0.85), alpha = 0.7) +
+  labs(
+    title = "Interaction between Function Type and Penalty",
+    x = "Function Type (g_id)",
+    y = "Normalized Mean Distance",
+    fill = "Penalty"
+  ) +
+  theme_minimal()
+
+# Create interaction plots for warping and penalty
+interaction_penalty_warping <- ggplot(benchmark_data, aes(x = warping, y = normalized_mean_distance, fill = penalty)) +
+  geom_boxplot(position = position_dodge(width = 0.85), alpha = 0.7) +
+  labs(
+    title = "Interaction between Warping Type and Penalty",
+    x = "Warping Type",
+    y = "Normalized Mean Distance",
+    fill = "Penalty"
+  ) +
+  theme_minimal()
+
+# Create interaction plots for g_id and lambda_grid_spacing
+interaction_spacing_g_id <- ggplot(benchmark_data, aes(x = g_id, y = normalized_mean_distance, fill = lambda_grid_spacing)) +
+  geom_boxplot(position = position_dodge(width = 0.85), alpha = 0.7) +
+  labs(
+    title = "Interaction between Function Type and Lambda Grid Spacing",
+    x = "Function Type (g_id)",
+    y = "Normalized Mean Distance",
+    fill = "Lambda Grid Spacing"
+  ) +
+  theme_minimal()
+
+# Create interaction plots for warping and lambda_grid_spacing
+interaction_spacing_warping <- ggplot(benchmark_data, aes(x = warping, y = normalized_mean_distance, fill = lambda_grid_spacing)) +
+  geom_boxplot(position = position_dodge(width = 0.85), alpha = 0.7) +
+  labs(
+    title = "Interaction between Warping Type and Lambda Grid Spacing",
+    x = "Warping Type",
+    y = "Normalized Mean Distance",
+    fill = "Lambda Grid Spacing"
+  ) +
+  theme_minimal()
+
+# Create interaction plots for g_id and curvature_percentile
+interaction_curvature_g_id <- ggplot(benchmark_data, aes(x = g_id, y = normalized_mean_distance, fill = curvature_percentile)) +
+  geom_boxplot(position = position_dodge(width = 0.85), alpha = 0.7) +
+  labs(
+    title = "Interaction between Function Type and Curvature Percentile",
+    x = "Function Type (g_id)",
+    y = "Normalized Mean Distance",
+    fill = "Curvature Percentile"
+  ) +
+  theme_minimal()
+
+# Create interaction plots for warping and curvature_percentile
+interaction_curvature_warping <- ggplot(benchmark_data, aes(x = warping, y = normalized_mean_distance, fill = curvature_percentile)) +
+  geom_boxplot(position = position_dodge(width = 0.85), alpha = 0.7) +
+  labs(
+    title = "Interaction between Warping Type and Curvature Percentile",
+    x = "Warping Type",
+    y = "Normalized Mean Distance",
+    fill = "Curvature Percentile"
+  ) +
+  theme_minimal()
+
+# Print interaction plots
+print(interaction_penalty_g_id)
+print(interaction_penalty_warping)
+print(interaction_spacing_g_id)
+print(interaction_spacing_warping)
+print(interaction_curvature_g_id)
+print(interaction_curvature_warping)
+```
+
