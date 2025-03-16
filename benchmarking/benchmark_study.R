@@ -1,9 +1,10 @@
-#' Run Benchmark Study
+#' Run Benchmark Study with Parallelization
 #'
 #' @description
 #' Executes a complete benchmark study by running multiple benchmarks with different
 #' parameter combinations and calculating metrics. Uses an efficient storage approach
-#' that saves individual results to separate files and metrics in batches.
+#' that saves individual results to separate files and metrics in batches. Supports
+#' parallelization over benchmark runs to better utilize available CPU cores.
 #'
 #' @param param_grid Data frame containing parameter combinations to benchmark.
 #' @param function_list List of functions to use for data generation.
@@ -12,6 +13,8 @@
 #' @param seed Integer or NULL, base seed for random number generation.
 #' @param runs_per_config Integer, number of repetitions to run for each parameter combination.
 #' @param metrics_save_interval Integer, save the metrics dataframe after this many runs (default: 10).
+#' @param parallel Logical, whether to use parallel processing across benchmark runs (default: TRUE).
+#' @param max_cores Integer, maximum number of cores to use for parallelization (default: NULL, which uses all available cores minus 1).
 #'
 #' @return A list containing all benchmark results and metrics.
 #'
@@ -34,22 +37,30 @@
 #' # Create function list
 #' function_list <- list(func_1, func_2)
 #'
-#' # Run benchmark study
+#' # Run benchmark study with parallelization
 #' study_results <- run_benchmark_study(
 #'   param_grid = grid,
 #'   function_list = function_list,
 #'   output_dir = "./benchmark_results",
 #'   save_plots = TRUE,
-#'   runs_per_config = 5
+#'   runs_per_config = 5,
+#'   parallel = TRUE,
+#'   max_cores = 8  # Use at most 8 cores
 #' )
 #' }
 #'
+#' @importFrom parallel detectCores makeCluster stopCluster clusterExport clusterEvalQ
+#' @importFrom doParallel registerDoParallel
+#' @importFrom foreach foreach '%dopar%'
+#' @importFrom utils write.csv
 #' @export
 run_benchmark_study <- function(param_grid, function_list,
                                 output_dir = "./benchmarking/results/test",
                                 save_plots = TRUE, seed = NULL,
                                 runs_per_config = 5,
-                                metrics_save_interval = 10) {
+                                metrics_save_interval = 10,
+                                parallel = TRUE,
+                                max_cores = NULL) {
   # Input validation
   if (!is.data.frame(param_grid)) {
     stop("param_grid must be a data frame")
@@ -59,6 +70,12 @@ run_benchmark_study <- function(param_grid, function_list,
   }
   if (!is.numeric(runs_per_config) || runs_per_config < 1) {
     stop("runs_per_config must be a positive integer")
+  }
+  if (!is.logical(parallel)) {
+    stop("parallel must be a logical value")
+  }
+  if (!is.null(max_cores) && (!is.numeric(max_cores) || max_cores < 1)) {
+    stop("max_cores must be NULL or a positive integer")
   }
 
   # Set base random seed if provided
@@ -78,6 +95,7 @@ run_benchmark_study <- function(param_grid, function_list,
   cat("Number of parameter combinations: ", nrow(param_grid), "\n", file = log_file, append = TRUE)
   cat("Runs per configuration: ", runs_per_config, "\n", file = log_file, append = TRUE)
   cat("Total benchmark runs: ", nrow(param_grid) * runs_per_config, "\n", file = log_file, append = TRUE)
+  cat("Parallelization: ", ifelse(parallel, "Enabled", "Disabled"), "\n", file = log_file, append = TRUE)
 
   # Expand parameter grid to include multiple runs per configuration
   expanded_grid <- expand_runs_grid(param_grid, runs_per_config, seed)
@@ -103,6 +121,14 @@ run_benchmark_study <- function(param_grid, function_list,
   if (save_plots) {
     plot_dir <- file.path(output_dir, "plots")
     dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  # Identify which benchmarks still need to be run (not in completed_ids)
+  remaining_indices <- which(!expanded_grid$benchmark_id %in% completed_ids)
+  if (length(remaining_indices) == 0) {
+    cat("All benchmarks already completed!\n", file = log_file, append = TRUE)
+  } else {
+    cat("Remaining benchmarks to run:", length(remaining_indices), "\n", file = log_file, append = TRUE)
   }
 
   # Function to convert a metrics list to a data frame row
@@ -140,7 +166,7 @@ run_benchmark_study <- function(param_grid, function_list,
   }
 
   # Function to run a single benchmark, calculate metrics, and save results
-  run_single_benchmark <- function(i) {
+  run_single_benchmark <- function(i, function_list, log_file, save_plots, plot_dir, completed_ids, results_dir, expanded_grid) {
     benchmark_id <- expanded_grid$benchmark_id[i]
     run_seed <- expanded_grid$run_seed[i]
     run_index <- expanded_grid$run_index[i]
@@ -148,7 +174,6 @@ run_benchmark_study <- function(param_grid, function_list,
 
     # Check if this benchmark has already been completed
     if (benchmark_id %in% completed_ids) {
-      cat("Skipping benchmark", benchmark_id, "(already completed)\n")
       return(NULL)
     }
 
@@ -157,13 +182,8 @@ run_benchmark_study <- function(param_grid, function_list,
 
     # If result file already exists, skip this benchmark
     if (file.exists(result_file)) {
-      cat("Skipping benchmark", benchmark_id, "(result file already exists)\n")
       return(NULL)
     }
-
-    cat("Running benchmark", i, "of", nrow(expanded_grid),
-        "(ID:", benchmark_id, ", Config:", config_id,
-        ", Run:", run_index, ", Seed:", run_seed, ")\n")
 
     # Get parameters for this run
     params <- expanded_grid[i, ]
@@ -198,39 +218,100 @@ run_benchmark_study <- function(param_grid, function_list,
       saveRDS(benchmark_result, result_file)
 
       # Return the metrics row
-      return(list(
-        metrics = metrics,
-        metrics_row = metrics_row
-      ))
+      return(metrics_row)
     }, error = function(e) {
       # Log error and continue with next benchmark
-      cat("ERROR in benchmark", benchmark_id, ":", e$message, "with seed:",
-          run_seed, "\n", file = log_file, append = TRUE)
+      error_msg <- paste("ERROR in benchmark", benchmark_id, ":", e$message, "with seed:",
+                         run_seed)
+      cat(error_msg, "\n", file = log_file, append = TRUE)
       return(NULL)
     })
   }
 
-  # Run the benchmarks
-  metrics_rows_buffer <- list()
-  metrics_save_counter <- 0
+  # Run the benchmarks (either in parallel or sequentially)
+  if (parallel && length(remaining_indices) > 0) {
+    # Check if parallel package is available
+    if (!requireNamespace("parallel", quietly = TRUE)) {
+      warning("Package 'parallel' is not available. Using sequential processing instead.")
+      parallel <- FALSE
+    } else if (!requireNamespace("foreach", quietly = TRUE) || !requireNamespace("doParallel", quietly = TRUE)) {
+      warning("Packages 'foreach' and 'doParallel' are required for parallelization. Using sequential processing instead.")
+      parallel <- FALSE
+    } else {
+      # Determine number of cores to use
+      n_available_cores <- parallel::detectCores() - 1
+      if (n_available_cores < 1) n_available_cores <- 1
 
-  for (i in 1:nrow(expanded_grid)) {
-    result <- run_single_benchmark(i)
+      if (is.null(max_cores)) {
+        n_cores <- n_available_cores
+      } else {
+        n_cores <- min(max_cores, n_available_cores)
+      }
 
-    if (!is.null(result)) {
-      # Add to metrics buffer
-      metrics_rows_buffer[[length(metrics_rows_buffer) + 1]] <- result$metrics_row
-      metrics_save_counter <- metrics_save_counter + 1
+      # Create a cluster with the specified number of cores
+      cat("Using", n_cores, "cores for parallelization\n", file = log_file, append = TRUE)
 
-      # Update log
-      cat("Completed benchmark", expanded_grid$benchmark_id[i], "\n",
+      # Setup parallel cluster
+      cl <- parallel::makeCluster(n_cores)
+      doParallel::registerDoParallel(cl)
+
+      # Export essential functions to the cluster
+      essential_functions <- c(
+        "run_simulation", "calculate_benchmark_metrics",
+        "peak_persistance_diagram", "shape_constrained_estimation",
+        "align_functions", "generate_functional_curves",
+        "align_to_mean", "expand_runs_grid"
+      )
+
+      parallel::clusterExport(cl, essential_functions, envir = .GlobalEnv)
+
+      # Load necessary external packages on all workers
+      parallel::clusterEvalQ(cl, {
+        library(tidyfun)
+        library(ggplot2)
+        library(PeakPersistance)
+      })
+
+      # Process in batches to allow for periodic saving of metrics
+      batch_size <- min(metrics_save_interval, length(remaining_indices))
+      total_batches <- ceiling(length(remaining_indices) / batch_size)
+
+      cat("Processing in", total_batches, "batches with up to", batch_size, "benchmarks per batch\n",
           file = log_file, append = TRUE)
 
-      # Save metrics dataframe every metrics_save_interval runs or at the end
-      if (metrics_save_counter >= metrics_save_interval || i == nrow(expanded_grid)) {
-        if (length(metrics_rows_buffer) > 0) {
+      for (batch_idx in 1:total_batches) {
+        batch_start <- (batch_idx - 1) * batch_size + 1
+        batch_end <- min(batch_idx * batch_size, length(remaining_indices))
+        batch_indices <- remaining_indices[batch_start:batch_end]
+
+        cat("Processing batch", batch_idx, "of", total_batches,
+            "(benchmarks", batch_start, "to", batch_end, ")\n",
+            file = log_file, append = TRUE)
+
+        # Run this batch in parallel
+        batch_results <- foreach::foreach(
+          i = batch_indices,
+          .packages = c("tidyfun", "ggplot2") # Include any other needed packages
+        ) %dopar% {
+          run_single_benchmark(
+            i = i,
+            function_list = function_list,
+            log_file = log_file,
+            save_plots = save_plots,
+            plot_dir = plot_dir,
+            completed_ids = completed_ids,
+            results_dir = results_dir,
+            expanded_grid = expanded_grid
+          )
+        }
+
+        # Filter out NULL results
+        batch_results <- batch_results[!sapply(batch_results, is.null)]
+
+        # Save metrics if we have results
+        if (length(batch_results) > 0) {
           # Combine new metrics rows with existing dataframe
-          new_rows_df <- do.call(rbind, metrics_rows_buffer)
+          new_rows_df <- do.call(rbind, batch_results)
           metrics_df <- rbind(metrics_df, new_rows_df)
 
           # Save updated metrics dataframe
@@ -239,12 +320,66 @@ run_benchmark_study <- function(param_grid, function_list,
           # Export as CSV for easier analysis
           utils::write.csv(metrics_df, file.path(output_dir, "metrics_dataframe.csv"), row.names = FALSE)
 
-          # Reset buffer and counter
-          metrics_rows_buffer <- list()
-          metrics_save_counter <- 0
-
-          cat("Saved metrics dataframe after", i, "benchmarks\n",
+          cat("Saved metrics after batch", batch_idx, "with", nrow(new_rows_df), "new results\n",
               file = log_file, append = TRUE)
+        }
+      }
+
+      # Clean up parallel cluster
+      parallel::stopCluster(cl)
+    }
+  }
+
+  # Fallback to sequential processing if parallel is disabled or failed
+  if (!parallel && length(remaining_indices) > 0) {
+    # Sequential processing
+    metrics_rows_buffer <- list()
+    metrics_save_counter <- 0
+
+    for (idx in seq_along(remaining_indices)) {
+      i <- remaining_indices[idx]
+      result_row <- run_single_benchmark(
+        i = i,
+        function_list = function_list,
+        log_file = log_file,
+        save_plots = save_plots,
+        plot_dir = plot_dir,
+        completed_ids = completed_ids,
+        results_dir = results_dir,
+        expanded_grid = expanded_grid
+      )
+
+      if (!is.null(result_row)) {
+        # Add to metrics buffer
+        metrics_rows_buffer[[length(metrics_rows_buffer) + 1]] <- result_row
+        metrics_save_counter <- metrics_save_counter + 1
+
+        # Update log
+        cat("Completed benchmark", expanded_grid$benchmark_id[i],
+            "(", idx, "of", length(remaining_indices), ")\n",
+            file = log_file, append = TRUE)
+
+        # Save metrics dataframe every metrics_save_interval runs or at the end
+        if (metrics_save_counter >= metrics_save_interval || idx == length(remaining_indices)) {
+          if (length(metrics_rows_buffer) > 0) {
+            # Combine new metrics rows with existing dataframe
+            new_rows_df <- do.call(rbind, metrics_rows_buffer)
+            metrics_df <- rbind(metrics_df, new_rows_df)
+
+            # Save updated metrics dataframe
+            saveRDS(metrics_df, metrics_df_file)
+
+            # Export as CSV for easier analysis
+            utils::write.csv(metrics_df, file.path(output_dir, "metrics_dataframe.csv"),
+                             row.names = FALSE)
+
+            # Reset buffer and counter
+            metrics_rows_buffer <- list()
+            metrics_save_counter <- 0
+
+            cat("Saved metrics dataframe after", idx, "benchmarks\n",
+                file = log_file, append = TRUE)
+          }
         }
       }
     }
@@ -276,6 +411,7 @@ run_benchmark_study <- function(param_grid, function_list,
     expanded_grid = expanded_grid
   ))
 }
+
 
 #' Expand Parameter Grid for Multiple Runs
 #'

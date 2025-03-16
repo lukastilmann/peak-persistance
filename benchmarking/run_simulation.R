@@ -14,7 +14,7 @@
 #' @return A list containing benchmark results, including all relevant data and results.
 run_simulation <- function(params, function_list, log_file = NULL,
                            save_plots = FALSE, plot_dir = NULL,
-                           seed = NULL) {
+                           seed = NULL, parallel_runs = TRUE) {
   # Initialize logging
   if (!is.null(log_file)) {
     log_msg <- paste0("Starting benchmark ID ", params$benchmark_id, " - ", format(Sys.time()))

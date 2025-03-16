@@ -52,7 +52,7 @@
 #' @importFrom doParallel registerDoParallel
 #' @export
 peak_persistance_diagram <- function(curves, t_grid,
-                                     parallel = TRUE,
+                                     parallel = FALSE,
                                      parallel_max_lambda = FALSE,
                                      lambda_search_start = 2,
                                      lambda_search_min_bound = 0.01,
