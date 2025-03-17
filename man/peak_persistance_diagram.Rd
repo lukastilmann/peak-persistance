@@ -7,7 +7,8 @@
 peak_persistance_diagram(
   curves,
   t_grid,
-  parallel = TRUE,
+  parallel = FALSE,
+  parallel_max_lambda = FALSE,
   lambda_search_start = 2,
   lambda_search_min_bound = 0.01,
   lambda_search_threshold = 0.001,
@@ -17,7 +18,7 @@ peak_persistance_diagram(
   max_iter = 20,
   penalty = c("roughness", "geodesic"),
   n_lambda = 10,
-  lambda_grid_spacing = 2,
+  lambda_grid_spacing = "sqrt",
   sig_threshold = 0.03,
   pers_threshold = 0.28,
   pers_method = c("clustering", "threshold")

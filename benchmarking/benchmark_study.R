@@ -55,6 +55,7 @@
 #' @importFrom utils write.csv
 #' @export
 run_benchmark_study <- function(param_grid, function_list,
+                                normalize_functions = TRUE,
                                 output_dir = "./benchmarking/results/test",
                                 save_plots = TRUE, seed = NULL,
                                 runs_per_config = 5,
@@ -152,18 +153,56 @@ run_benchmark_study <- function(param_grid, function_list,
     }
     # Add number of peaks from peak-persistence-diagram
     row_data[["num_peaks"]] <- metrics$num_peaks
-    # Add distances
-    row_data[["mean_ground_truth_distance"]] <- metrics$mean_ground_truth_distance
-    row_data[["est_ground_truth_distance"]] <- metrics$est_ground_truth_distance
+    row_data[["num_peaks_error"]] <- metrics$num_peaks_error
+
+    # Add ground truth distances
+    row_data[["mean_func_ground_truth_dist"]] <- metrics$mean_func_ground_truth_dist
+    row_data[["sce_func_ground_truth_dist"]] <- metrics$sce_func_ground_truth_dist
+
+    # Add phase amplitude separation distances and distance of warping function
+    # to identity warping function
+    row_data[["mean_func_amplitude_dist"]] <- metrics$mean_func_amplitude_dist
+    row_data[["mean_func_phase_dist"]] <- metrics$mean_func_phase_dist
+    row_data[["mean_func_gt_warping_dist"]] <- metrics$mean_func_gt_warping_dist
+
+    row_data[["sce_func_amplitude_dist"]] <- metrics$sce_func_amplitude_dist
+    row_data[["sce_func_phase_dist"]] <- metrics$sce_func_phase_dist
+    row_data[["sce_func_gt_warping_dist"]] <- metrics$sce_func_gt_warping_dist
+
     # Add warping distances
     if (!is.null(metrics$warping_distances)) {
       for (wd_name in names(metrics$warping_distances)) {
         row_data[[paste0("warping_distances_", wd_name)]] <- metrics$warping_distances[[wd_name]]
       }
     }
+
     # Convert to data frame row
     return(data.frame(row_data, stringsAsFactors = FALSE))
   }
+
+  # Calculate true number of peaks for each function in function_list
+  t_grid_sample <- seq(0, 1, length.out = 1000)  # Dense grid for accurate sampling
+  function_peak_counts <- numeric(length(function_list))
+
+  for (i in seq_along(function_list)) {
+    function_peak_counts[i] <- count_peaks_in_function(function_list[[i]], t_grid_sample)
+  }
+
+  # Normalizing functions
+  if (normalize_functions){
+    cat("Normalizing functions by variance\n", file = log_file, append = TRUE)
+    function_list <- lapply(function_list, function(func){
+      # Evaluate function on grid
+      func_values <- func(t_grid_sample)
+
+      # Calculate variance using tf_fvar from tidyfun
+      func_var <- tf::tf_fvar(tfd(func_values, t_grid_sample), t_grid_sample)
+
+      # Return normalized function
+      function(x) func(x) / func_var
+    })
+  }
+
 
   # Function to run a single benchmark, calculate metrics, and save results
   run_single_benchmark <- function(i, function_list, log_file, save_plots, plot_dir, completed_ids, results_dir, expanded_grid) {
@@ -196,7 +235,8 @@ run_benchmark_study <- function(param_grid, function_list,
         log_file = log_file,
         save_plots = save_plots,
         plot_dir = plot_dir,
-        seed = run_seed  # Use the unique seed for this run
+        seed = run_seed,
+        function_peak_counts = function_peak_counts
       )
 
       # Store the run seed and run index in the result

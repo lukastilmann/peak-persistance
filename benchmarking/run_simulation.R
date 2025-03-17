@@ -12,7 +12,9 @@
 #' @importFrom tidyfun geom_spaghetti
 #'
 #' @return A list containing benchmark results, including all relevant data and results.
-run_simulation <- function(params, function_list, log_file = NULL,
+run_simulation <- function(params, function_list,
+                           function_peak_counts = NULL,
+                           log_file = NULL,
                            save_plots = FALSE, plot_dir = NULL,
                            seed = NULL, parallel_runs = TRUE) {
   # Initialize logging
@@ -47,6 +49,11 @@ run_simulation <- function(params, function_list, log_file = NULL,
     g_id_numeric <- as.integer(g_id)
     if (is.na(g_id_numeric) || g_id_numeric < 1 || g_id_numeric > length(function_list)) {
       stop(paste("Invalid g_id:", g_id, "- must be a number between 1 and", length(function_list)))
+    }
+
+    # Storing true number of peaks
+    if (!is.null(function_peak_counts) && g_id_numeric <= length(function_peak_counts)) {
+      result$true_num_peaks <- function_peak_counts[g_id_numeric]
     }
 
     # Initialize parameters for data generation

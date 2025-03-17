@@ -6,9 +6,11 @@
 #'
 #' @param max_value Numeric. The maximum value in the grid.
 #' @param n_points Integer. The number of points in the grid. Default is 10.
-#' @param spacing Either "log" for logarithmic spacing or a numeric value for power-based spacing.
+#' @param spacing Either "log" for logarithmic spacing or "sqrt" for squareroot
+#'                spacing or "cubicrt" for cubic root spacing.
 #'                If "log", points are spaced logarithmically between a small value and max_value.
-#'                If numeric (e.g., 2), points are spaced according to value^(1/spacing). Default is "log".
+#'                If a root, points are spaced according to value^(1/2)or value^(1/3).
+#'                Default is "log".
 #'
 #' @return A numeric vector of length n_points containing the parameter grid with the specified spacing.
 #'         The grid always includes 0 when spacing="log".
@@ -22,7 +24,7 @@
 #'
 #' @export
 create_lambda_grid <- function(max_value = 2, n_points = 10,
-                               lambda_grid_spacing = c("log", "sqrt")) {
+                               lambda_grid_spacing = c("log", "sqrt", "cubicrt")) {
   # Input validation
   checkmate::assert_number(max_value, lower = 0, finite = TRUE)
   lambda_grid_spacing <- match.arg(lambda_grid_spacing)
@@ -30,10 +32,10 @@ create_lambda_grid <- function(max_value = 2, n_points = 10,
   if (lambda_grid_spacing == "log") {
     min_value <- 1e-4  # Small positive number close to zero
     return(c(0, exp(seq(log(min_value), log(max_value), length.out = n_points - 1))))
-  } else {
+  } else if (lambda_grid_spacing == "sqrt"){
     # For square root spacing
     return(seq(0, (max_value)^(1/2), length.out = n_points)^2)
+  } else {
+    return(seq(0, (max_value)^(1/3), length.out = n_points)^3)
   }
 }
-
-

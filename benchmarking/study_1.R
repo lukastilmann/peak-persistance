@@ -1,9 +1,17 @@
 devtools::load_all(".")
+# Before setting up the cluster
+devtools::install(quick = TRUE, quiet = TRUE)
+library(tidyfun)
+library(ggplot2)
+library(foreach)
+library(doParallel)
 source("./benchmarking/create_settings.R")
 source("./benchmarking/run_simulation.R")
 source("./benchmarking/calculate_benchmark_metrics.R")
 source("./benchmarking/benchmark_study.R")
+source("./benchmarking/benchmark_utils.R")
 
+t_grid <- seq(0, 1, length.out = 100)
 fun_1 <- generate_benchmark_function(list("normal", "normal"),
                                      c(10, 10), c(0.3, 0.7), c(10, 10))
 
@@ -35,11 +43,11 @@ fun_3 <- generate_benchmark_function(
 )
 
 
-functions_list <- c(fun_1,fun_2, fun_3)
+functions_list <- c(fun_1, fun_2)
 
 grid <- create_benchmark_grid(
-  g_id = c(1, 2, 3),
-  n = c(50, 150),
+  g_id = c(1, 2),
+  n = c(25, 100),
   noise_to_signal = c(0.001, 0.04),
   sigma_amplitude = c(0.1, 0.4),
   warping = list(
@@ -52,11 +60,15 @@ grid <- create_benchmark_grid(
   lambda_search_threshold = c(0.1),
   lambda_search_min_bound = c(0.1),
   curvature_percentile = c(10, 30),
-  penalty = c("roughness", "geodesic"),
-  lambda_grid_spacing = c("sqrt", "log")
+  lambda_grid_spacing = c("sqrt", "log", "cubicrt")
 )
 
+grid <- grid[1:3,]
 
 benchmark_study <- run_benchmark_study(grid, functions_list,
-                                       output_dir = "./benchmarking/results/study1_results",
-                                       save_plots = TRUE, runs_per_config = 5)
+                                       normalize_functions = TRUE,
+                                       output_dir = "./benchmarking/results/new_metrics_test_4",
+                                       save_plots = TRUE, runs_per_config = 2,
+                                       seed = 1,
+                                       parallel = TRUE,
+                                       max_cores = 8)

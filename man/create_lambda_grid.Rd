@@ -4,7 +4,11 @@
 \alias{create_lambda_grid}
 \title{Create Parameter Grids with Different Spacings}
 \usage{
-create_lambda_grid(max_value = 2, n_points = 10, spacing = "log")
+create_lambda_grid(
+  max_value = 2,
+  n_points = 10,
+  lambda_grid_spacing = c("log", "sqrt")
+)
 }
 \arguments{
 \item{max_value}{Numeric. The maximum value in the grid.}
