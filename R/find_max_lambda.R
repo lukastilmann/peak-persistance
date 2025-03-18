@@ -153,8 +153,12 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
       # Get new candidate by extrapolating from prev lower bound and evaluated
       # candidate
       fn_lower_cand_diff <- fn_val_lower_bound - candidate_fn
+      # Setting to 0.01 in case new candidate actually had worse alignment than
+      # prior candidate value
+      fn_lower_cand_diff <- max(0.01, fn_lower_cand_diff)
       fn_lower_target_diff <- fn_val_lower_bound - threshold
       diff_ratio <- (fn_lower_target_diff / fn_lower_cand_diff) - 1
+      diff_ratio <- max(0.01, diff_ratio)
       interval_diff <- candidate - lower_bound
 
       # Setting lower bound to old candidate
@@ -162,6 +166,7 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
       lower_bound <- candidate
 
       # Evaluating new candidate
+      #browser()
       dist_from_candidate <- (diff_ratio ^ (1/3)) * interval_diff
       dist_from_candidate <- max(3 * min_bound, dist_from_candidate)
       candidate_new <- candidate + dist_from_candidate
@@ -170,7 +175,7 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
 
       start_i <- start_i + 1
 
-      if (start_i > max_search_steps / 2) {
+      if (start_i > (max_search_steps / 2)) {
         warning("Could not find lambda with norm below threshold. Consider increasing start_val or threshold.")
         return(upper_bound)  # Return the best found so far
       }

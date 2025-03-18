@@ -114,16 +114,16 @@ shape_constrained_estimation <- function(curve_data, peak_locs, valley_locs,
   peak_locs <- peak_locs[as.character(significant_peaks)]
 
   # Check bounds
-  if (mean_function[, t_grid[1]] > mean_function[, t_grid[2]]) {
-    peak_locs <- c(peak_locs, t_grid[1])
+  if (mean_function[, t_grid[2]] > mean_function[, t_grid[2]]) {
+    peak_locs <- c(peak_locs, t_grid[2])
   } else {
-    valley_locs <- c(valley_locs, t_grid[1])
+    valley_locs <- c(valley_locs, t_grid[2])
   }
-  if (mean_function[, t_grid[length(t_grid)]] >
-      mean_function[, t_grid[length(t_grid) - 1]]) {
-    peak_locs <- c(peak_locs, t_grid[length(t_grid)])
+  if (mean_function[, t_grid[length(t_grid) - 1]] >
+      mean_function[, t_grid[length(t_grid) - 2]]) {
+    peak_locs <- c(peak_locs, t_grid[length(t_grid) - 1])
   } else {
-    valley_locs <- c(valley_locs, t_grid[length(t_grid)])
+    valley_locs <- c(valley_locs, t_grid[length(t_grid) - 1])
   }
 
   # Find deepest valley between consecutive peaks

@@ -42,14 +42,13 @@ fun_3 <- generate_benchmark_function(
   scale_factors = c(25, 75, 75, 75, 75)
 )
 
-
-functions_list <- c(fun_1, fun_2)
+functions_list <- c(fun_1, fun_2, fun_3)
 
 grid <- create_benchmark_grid(
-  g_id = c(1, 2),
-  n = c(25, 100),
-  noise_to_signal = c(0.001, 0.04),
-  sigma_amplitude = c(0.1, 0.4),
+  noise_to_signal = c(0.01, 0.075),
+  g_id = c(1, 2, 3),
+  n = c(30, 200),
+  sigma_amplitude = c(0.1, 0.6),
   warping = list(
     simple = list(),
     flexible = list(
@@ -59,15 +58,14 @@ grid <- create_benchmark_grid(
   ),
   lambda_search_threshold = c(0.1),
   lambda_search_min_bound = c(0.1),
-  curvature_percentile = c(10, 30),
-  lambda_grid_spacing = c("sqrt", "log", "cubicrt")
+  curvature_percentile = c(15, 45),
+  lambda_grid_spacing = c("log", "sqrt", "cubicrt")
 )
 
-grid <- grid[1:3,]
 
 benchmark_study <- run_benchmark_study(grid, functions_list,
                                        normalize_functions = TRUE,
-                                       output_dir = "./benchmarking/results/new_metrics_test_4",
+                                       output_dir = "./benchmarking/results/study_1",
                                        save_plots = TRUE, runs_per_config = 2,
                                        seed = 1,
                                        parallel = TRUE,
