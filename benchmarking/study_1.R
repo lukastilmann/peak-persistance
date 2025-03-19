@@ -46,27 +46,28 @@ functions_list <- c(fun_1, fun_2, fun_3)
 
 grid <- create_benchmark_grid(
   noise_to_signal = c(0.01, 0.075),
-  g_id = c(1, 2, 3),
-  n = c(30, 200),
   sigma_amplitude = c(0.1, 0.6),
+  g_id = c(1, 2, 3),
+  n = c(30, 100, 200),
   warping = list(
     simple = list(),
     flexible = list(
-      warping_gamma = c(3),
+      warping_gamma = c(3, 10),
       warping_points = c(5)
     )
   ),
   lambda_search_threshold = c(0.1),
   lambda_search_min_bound = c(0.1),
-  curvature_percentile = c(15, 45),
+  curvature_percentile = c(15, 30, 45),
   lambda_grid_spacing = c("log", "sqrt", "cubicrt")
 )
 
 
 benchmark_study <- run_benchmark_study(grid, functions_list,
                                        normalize_functions = TRUE,
-                                       output_dir = "./benchmarking/results/study_1",
-                                       save_plots = TRUE, runs_per_config = 2,
+                                       output_dir = "./benchmarking/results/study",
+                                       save_plots = TRUE, runs_per_config = 7,
                                        seed = 1,
+                                       metrics_save_interval = 7,
                                        parallel = TRUE,
                                        max_cores = 8)

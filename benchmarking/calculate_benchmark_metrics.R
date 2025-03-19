@@ -98,12 +98,13 @@ calculate_benchmark_metrics <- function(benchmark_result) {
       warping_function <- res_align$warping_function
 
       amplitude_dist_mean <- sqrt(tf::tf_integrate((q_1 - q_2_aligned)^2,
-                           lower = tf::tf_domain(q_1)[1], upper = tf_domain(q_1)[2]))
+                           lower = tf::tf_domain(q_1)[1], upper = tf::tf_domain(q_1)[2]))
 
-      # Convert to basis representation to compute derivative
-      warping_function_b <- tf::tfb(warping_function, arg = t_grid, basis = "spline")
-      # Calculating phase distance metric
-      warping_function_deriv <- tf::tfd(tf::tf_derive(warping_function_b), t_grid)
+      # Approximation of phase distance
+      warping_function_deriv <- tf::tf_derive(warping_function, t_grid)
+      sum_deriv <- tf::tf_integrate(warping_function_deriv, lower = tf_domain(warping_function_deriv)[1],
+                                    upper = tf_domain(warping_function_deriv)[2])
+      warping_function_deriv <- warping_function_deriv / sum_deriv
       warping_function_deriv_sqrt <- sqrt(warping_function_deriv)
       warp_deriv_integral <- tf::tf_integrate(warping_function_deriv_sqrt,
                                               lower = tf::tf_domain(warping_function_deriv_sqrt)[1],
@@ -151,10 +152,11 @@ calculate_benchmark_metrics <- function(benchmark_result) {
                                                    lower = tf::tf_domain(q_1)[1],
                                                    upper = tf::tf_domain(q_1)[2]))
 
-      # Convert to basis representation to compute derivative
-      warping_function_b <- tf::tfb(warping_function, arg = t_grid, basis = "spline")
-      # Calculating phase distance metric
-      warping_function_deriv <- tf::tfd(tf::tf_derive(warping_function_b), t_grid)
+      # Calculating approximation of phase distance
+      warping_function_deriv <- tf::tf_derive(warping_function, t_grid)
+      sum_deriv <- tf::tf_integrate(warping_function_deriv, lower = tf_domain(warping_function_deriv)[1],
+                                      upper = tf_domain(warping_function_deriv)[2])
+      warping_function_deriv <- warping_function_deriv / sum_deriv
       warping_function_deriv_sqrt <- sqrt(warping_function_deriv)
       warp_deriv_integral <- tf::tf_integrate(warping_function_deriv_sqrt,
                                               lower = tf::tf_domain(warping_function_deriv_sqrt)[1],

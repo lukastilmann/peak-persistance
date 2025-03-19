@@ -166,7 +166,6 @@ find_max_lambda <- function(function_curves, start_val = 2, threshold = 1e-2,
       lower_bound <- candidate
 
       # Evaluating new candidate
-      #browser()
       dist_from_candidate <- (diff_ratio ^ (1/3)) * interval_diff
       dist_from_candidate <- max(3 * min_bound, dist_from_candidate)
       candidate_new <- candidate + dist_from_candidate
