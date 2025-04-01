@@ -57,10 +57,9 @@ tau
 t_grid <- curve_data$t_grid
 curves <- curve_data$curves
 
-n_lambda <- 5
+n_lambda <- 20
 lam_start <- 2.5
 sig_threshold <- tau
-pers_threshold <- 0.28
 ```
 
 
@@ -70,12 +69,11 @@ ret <- peak_persistance_diagram(curves = curves,
                                 parallel = FALSE,
                                 lambda_search_start = lam_start,
                                 lambda_search_min_bound = 0.1,
-                                lambda_search_threshold = 1e-3,
-                                max_lambda_search_steps = 5,
+                                lambda_search_threshold = 0.1,
+                                max_lambda_search_steps = 10,
                                 n_lambda = n_lambda,
                                 max_iter = 5,
                                 sig_threshold = sig_threshold, 
-                                pers_threshold = pers_threshold,
                                 pers_method = "clustering")
 ```
 
@@ -101,7 +99,7 @@ t_grid <- ret$time_grid
 fun_aligned <- ret$aligned_functions
 
 k = 8
-rho = 1e-6
+rho = 1e-9
 basis_type = "tp"
 
 fn_est <- shape_constrained_estimation(fun_aligned, peak_locs, valley_locs, 
@@ -161,19 +159,18 @@ tau
 t_grid_c <- curve_data$t_grid
 curves_c <- curve_data_complex$curves
 
-n_lambda <- 15
+n_lambda <- 20
 lam_start <- 2
 sig_threshold <- tau
-pers_threshold <- 0.28
+
 ret_c <- peak_persistance_diagram(curves = curves_c, 
                                 t_grid = t_grid,
                                 parallel = FALSE,
                                 lambda_search_start = lam_start,
-                                lambda_search_min_bound = 0.01,
-                                lambda_search_threshold = 1e-3,
-                                n_lambda = 25,
-                                sig_threshold = sig_threshold, 
-                                pers_threshold = pers_threshold)
+                                lambda_search_min_bound = 0.1,
+                                lambda_search_threshold = 0.1,
+                                n_lambda = n_lambda,
+                                sig_threshold = sig_threshold)
 ```
 
 

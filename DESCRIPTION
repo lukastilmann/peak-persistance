@@ -22,7 +22,6 @@ Imports:
     tf,
     dplyr,
     pracma,
-    NlcOptim,
     mgcv,
     MASS,
     magrittr,

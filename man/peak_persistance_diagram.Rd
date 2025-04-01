@@ -17,8 +17,8 @@ peak_persistance_diagram(
   basis_dim = 20,
   max_iter = 20,
   penalty = c("roughness", "geodesic"),
-  n_lambda = 10,
-  lambda_grid_spacing = "sqrt",
+  n_lambda = 20,
+  lambda_grid_spacing = c("log", "sqrt", "cubicrt"),
   sig_threshold = 0.03,
   pers_threshold = 0.28,
   pers_method = c("clustering", "threshold")
@@ -29,7 +29,7 @@ peak_persistance_diagram(
 
 \item{t_grid}{Numeric vector representing the time grid for the functional data.}
 
-\item{parallel}{Logical indicating whether to use parallel processing.}
+\item{parallel}{Logical indicating whether to use parallel processing. (default: FALSE)}
 
 \item{lambda_search_start}{Numeric, starting value for searching maximum lambda (default: 2).}
 
@@ -39,17 +39,25 @@ peak_persistance_diagram(
 
 \item{max_lambda_search_steps}{Integer, maximum number of steps for lambda search (default: 20).}
 
+\item{curvature_percentile}{Numeric, indicates curvature percentile to be used when searching significance threshold. (default: NULL)}
+
+\item{basis_dim}{Integer. Sets number of basis dimensions for spline representation of data. (default: 20)}
+
 \item{max_iter}{Integer, maximum number of iterations for align_functions (default: 20).}
 
 \item{penalty}{Character, penalty used in function alignment.}
 
-\item{n_lambda}{Integer, number of lambda values to evaluate (default: 10).}
+\item{n_lambda}{Integer, number of lambda values to evaluate (default: 20).}
+
+\item{lambda_grid_spacing}{Character indicating spacing of lambda grid. Can be "log", "sqrt" or "cubicrt". (default: log)}
 
 \item{sig_threshold}{Numeric, threshold for peak significance (default: 0.03).}
 
 \item{pers_threshold}{Numeric, threshold for peak persistence when using 'threshold' method (default: 0.28).}
 
 \item{pers_method}{Character, method for determining persistent peaks: "clustering" or "threshold" (default: "clustering").}
+
+\item{parallel_max_lanbda}{Logical indicating whether to use parallel processing when searching max lambda value. (default: FALSE)}
 }
 \value{
 A list containing:

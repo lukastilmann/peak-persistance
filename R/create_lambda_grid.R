@@ -6,7 +6,7 @@
 #'
 #' @param max_value Numeric. The maximum value in the grid.
 #' @param n_points Integer. The number of points in the grid. Default is 10.
-#' @param spacing Either "log" for logarithmic spacing or "sqrt" for squareroot
+#' @param lambda_grid_spacing Either "log" for logarithmic spacing or "sqrt" for squareroot
 #'                spacing or "cubicrt" for cubic root spacing.
 #'                If "log", points are spaced logarithmically between a small value and max_value.
 #'                If a root, points are spaced according to value^(1/2)or value^(1/3).
@@ -17,10 +17,10 @@
 #'
 #' @examples
 #' # Create a logarithmically spaced grid
-#' log_grid <- create_lambda_grid(10, n_points = 5, spacing = "log")
+#' log_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = "log")
 #'
 #' # Create a square root spaced grid (spacing = 2)
-#' sqrt_grid <- create_lambda_grid(10, n_points = 5, spacing = 2)
+#' sqrt_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = 2)
 #'
 #' @export
 create_lambda_grid <- function(max_value = 2, n_points = 10,

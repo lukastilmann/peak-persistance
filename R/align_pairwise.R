@@ -26,10 +26,6 @@
 #' the distance between the SRVFs of the two functions, with an optional regularization term
 #' controlled by lambda. The Dynamic Programming algorithm is used for optimization.
 #'
-#' @note
-#' There appears to be a possible bug in the return statement, where 'q_2_tf' is referenced
-#' but not defined. This might need to be corrected to 'q_2_aligned_tf'.
-#'
 #' @examples
 #' \dontrun{
 #' # Create two example tf objects
@@ -85,7 +81,7 @@ align_pairwise <- function(function_1, function_2, t_grid = NULL, lambda = 0) {
   q_2 = fdasrvf::f_to_srvf(fun_2, t_grid)
 
   # Align to target function
-  warping_function <- optimum.reparam(q_1, t_grid, q_2, t_grid, lambda, "roughness",
+  warping_function <- fdasrvf::optimum.reparam(q_1, t_grid, q_2, t_grid, lambda, "roughness",
                          "DP", f1o=fun_1[1], f2o=fun_2[1])
 
   fun_2_aligned <- fdasrvf::warp_f_gamma(fun_2, t_grid, warping_function)

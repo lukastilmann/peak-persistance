@@ -34,7 +34,7 @@ shape_constrained_estimation(
 
 \item{t_grid}{Numeric vector representing the time grid}
 
-\item{rho}{Numeric smoothness penalty parameter}
+\item{rho}{Numeric smoothness penalty parameter. Default is 1e-9.}
 
 \item{basis_type}{Character specifying basis type (default: "cr" for cubic regression splines)}
 }

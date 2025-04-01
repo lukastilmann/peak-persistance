@@ -37,10 +37,6 @@ to find optimal time-warping. The alignment process finds a warping function tha
 the distance between the SRVFs of the two functions, with an optional regularization term
 controlled by lambda. The Dynamic Programming algorithm is used for optimization.
 }
-\note{
-There appears to be a possible bug in the return statement, where 'q_2_tf' is referenced
-but not defined. This might need to be corrected to 'q_2_aligned_tf'.
-}
 \examples{
 \dontrun{
 # Create two example tf objects

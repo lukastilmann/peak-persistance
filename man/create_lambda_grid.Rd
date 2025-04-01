@@ -7,7 +7,7 @@
 create_lambda_grid(
   max_value = 2,
   n_points = 10,
-  lambda_grid_spacing = c("log", "sqrt")
+  lambda_grid_spacing = c("log", "sqrt", "cubicrt")
 )
 }
 \arguments{
@@ -15,9 +15,11 @@ create_lambda_grid(
 
 \item{n_points}{Integer. The number of points in the grid. Default is 10.}
 
-\item{spacing}{Either "log" for logarithmic spacing or a numeric value for power-based spacing.
+\item{lambda_grid_spacing}{Either "log" for logarithmic spacing or "sqrt" for squareroot
+spacing or "cubicrt" for cubic root spacing.
 If "log", points are spaced logarithmically between a small value and max_value.
-If numeric (e.g., 2), points are spaced according to value^(1/spacing). Default is "log".}
+If a root, points are spaced according to value^(1/2)or value^(1/3).
+Default is "log".}
 }
 \value{
 A numeric vector of length n_points containing the parameter grid with the specified spacing.
@@ -29,9 +31,9 @@ typically for regularization parameters in statistical models.
 }
 \examples{
 # Create a logarithmically spaced grid
-log_grid <- create_lambda_grid(10, n_points = 5, spacing = "log")
+log_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = "log")
 
 # Create a square root spaced grid (spacing = 2)
-sqrt_grid <- create_lambda_grid(10, n_points = 5, spacing = 2)
+sqrt_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = 2)
 
 }

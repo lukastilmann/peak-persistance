@@ -25,7 +25,6 @@ normalized curvature values at these peaks.
 \details{
 The function performs the following steps:
 \enumerate{
-\item Smooths the input function curves using lowess smoothing
 \item Calculates first and second derivatives
 \item Identifies peaks as points where the slope changes from positive to negative
 \item Calculates normalized curvature values at these peaks

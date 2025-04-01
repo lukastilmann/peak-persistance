@@ -7,14 +7,18 @@
 #'
 #' @param curves An object containing functional data to be analyzed, compatible with the tfb function.
 #' @param t_grid Numeric vector representing the time grid for the functional data.
-#' @param parallel Logical indicating whether to use parallel processing.
+#' @param parallel Logical indicating whether to use parallel processing. (default: FALSE)
+#' @param parallel_max_lanbda Logical indicating whether to use parallel processing when searching max lambda value. (default: FALSE)
 #' @param lambda_search_start Numeric, starting value for searching maximum lambda (default: 2).
 #' @param lambda_search_min_bound Numeric, minimum bound for lambda search (default: 0.01).
 #' @param lambda_search_threshold Numeric, convergence threshold for lambda search (default: 1e-3).
 #' @param max_lambda_search_steps Integer, maximum number of steps for lambda search (default: 20).
+#' @param curvature_percentile Numeric, indicates curvature percentile to be used when searching significance threshold. (default: NULL)
+#' @param basis_dim Integer. Sets number of basis dimensions for spline representation of data. (default: 20)
 #' @param max_iter Integer, maximum number of iterations for align_functions (default: 20).
 #' @param penalty Character, penalty used in function alignment.
-#' @param n_lambda Integer, number of lambda values to evaluate (default: 10).
+#' @param n_lambda Integer, number of lambda values to evaluate (default: 20).
+#' @param lambda_grid_spacing Character indicating spacing of lambda grid. Can be "log", "sqrt" or "cubicrt". (default: log)
 #' @param sig_threshold Numeric, threshold for peak significance (default: 0.03).
 #' @param pers_threshold Numeric, threshold for peak persistence when using 'threshold' method (default: 0.28).
 #' @param pers_method Character, method for determining persistent peaks: "clustering" or "threshold" (default: "clustering").
@@ -63,7 +67,7 @@ peak_persistance_diagram <- function(curves, t_grid,
                                      max_iter = 20,
                                      penalty = c("roughness", "geodesic"),
                                      n_lambda = 20,
-                                     lambda_grid_spacing = "sqrt",
+                                     lambda_grid_spacing = c("log", "sqrt", "cubicrt"),
                                      sig_threshold = 0.03,
                                      pers_threshold = 0.28,
                                      pers_method = c("clustering", "threshold")) {
@@ -81,6 +85,7 @@ peak_persistance_diagram <- function(curves, t_grid,
 
   penalty <- match.arg(penalty)
   pers_method <- match.arg(pers_method)
+  lambda_grid_spacing <- match.arg(lambda_grid_spacing)
 
   # Create dataframe with function curves
   tryCatch({

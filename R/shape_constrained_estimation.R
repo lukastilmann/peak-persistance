@@ -10,7 +10,7 @@
 #' @param mean_function Functional data object representing the mean function
 #' @param basis_dim Integer specifying the basis dimension. Default is 8.
 #' @param t_grid Numeric vector representing the time grid
-#' @param rho Numeric smoothness penalty parameter
+#' @param rho Numeric smoothness penalty parameter. Default is 1e-9.
 #' @param basis_type Character specifying basis type (default: "cr" for cubic regression splines)
 #'
 #' @return A functional data object of class tf representing the estimated function

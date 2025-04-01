@@ -14,11 +14,10 @@
 #'
 #' @details
 #' The function performs the following steps:
-#' 1. Smooths the input function curves using lowess smoothing
-#' 2. Calculates first and second derivatives
-#' 3. Identifies peaks as points where the slope changes from positive to negative
-#' 4. Calculates normalized curvature values at these peaks
-#' 5. Returns the value at the specified percentile of all curvature values
+#' 1. Calculates first and second derivatives
+#' 2. Identifies peaks as points where the slope changes from positive to negative
+#' 3. Calculates normalized curvature values at these peaks
+#' 4. Returns the value at the specified percentile of all curvature values
 #'
 #' Note that curvature values are negated and normalized by the maximum absolute value,
 #' with negative values truncated to zero.
