@@ -8,7 +8,7 @@
 #' @param curves An object containing functional data to be analyzed, compatible with the tfb function.
 #' @param t_grid Numeric vector representing the time grid for the functional data.
 #' @param parallel Logical indicating whether to use parallel processing. (default: FALSE)
-#' @param parallel_max_lanbda Logical indicating whether to use parallel processing when searching max lambda value. (default: FALSE)
+#' @param parallel_max_lambda Logical indicating whether to use parallel processing when searching max lambda value. (default: FALSE)
 #' @param lambda_search_start Numeric, starting value for searching maximum lambda (default: 2).
 #' @param lambda_search_min_bound Numeric, minimum bound for lambda search (default: 0.01).
 #' @param lambda_search_threshold Numeric, convergence threshold for lambda search (default: 1e-3).

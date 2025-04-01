@@ -31,6 +31,8 @@ peak_persistance_diagram(
 
 \item{parallel}{Logical indicating whether to use parallel processing. (default: FALSE)}
 
+\item{parallel_max_lambda}{Logical indicating whether to use parallel processing when searching max lambda value. (default: FALSE)}
+
 \item{lambda_search_start}{Numeric, starting value for searching maximum lambda (default: 2).}
 
 \item{lambda_search_min_bound}{Numeric, minimum bound for lambda search (default: 0.01).}
@@ -56,8 +58,6 @@ peak_persistance_diagram(
 \item{pers_threshold}{Numeric, threshold for peak persistence when using 'threshold' method (default: 0.28).}
 
 \item{pers_method}{Character, method for determining persistent peaks: "clustering" or "threshold" (default: "clustering").}
-
-\item{parallel_max_lanbda}{Logical indicating whether to use parallel processing when searching max lambda value. (default: FALSE)}
 }
 \value{
 A list containing:

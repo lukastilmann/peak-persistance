@@ -33,7 +33,7 @@ typically for regularization parameters in statistical models.
 # Create a logarithmically spaced grid
 log_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = "log")
 
-# Create a square root spaced grid (spacing = 2)
-sqrt_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = 2)
+# Create a square root spaced grid
+sqrt_grid <- create_lambda_grid(10, n_points = 5, lambda_grid_spacing = "sqrt")
 
 }
